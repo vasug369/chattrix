@@ -14,11 +14,37 @@ const userSchema=new mongoose.Schema({
 
 
     },
-    Password:{
+    password:{
         type:String,
         required:true
 
     },
+
+    verifyOtp:{ 
+        type:String,
+        default:""
+    },
+
+    verifyOtpExpiry:{
+        type:Date,
+        default:0
+    },
+
+    isAccountVerified:{
+        type:Boolean,
+        default:false
+    },
+
+    resetOtp:{
+        type:String,
+        default:""
+    },
+
+    resetOtpExpiry:{
+        type:Date,
+        default:0
+    },
+
     createdAt:{
         type:Date,
         default:Date.now
