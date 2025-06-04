@@ -5,6 +5,7 @@ import { login } from './controllers/authController.js';
 import authRouter from './routes/authRoutes.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import postRouter from './routes/postRoutes.js';
 
 connectDB();
 dotenv.config();
@@ -12,8 +13,8 @@ dotenv.config();
 
 // const dummy=new User({
 //     name:"vasu",
-//     email:"asdas1@gmail.com",
-//     Password:"1232"
+//     email:"dummy123@gmail.com",
+//     password:"1234"
 // })
 
 // dummy.save()
@@ -40,18 +41,19 @@ app.use(cors({
 }));
 
 app.use('/api/auth',authRouter);
+app.use('/api/post',postRouter);
 
-// Basic route
-app.get('/', (req, res) => {
-    res.send('Welcome to the backend server!');
-});
+// // Basic route
+// app.get('/', (req, res) => {
+//     res.send('Welcome to the backend server!');
+// });
 
-app.post('/login',login);
+// app.post('/login',login);
 
 
-app.post('/user',(req,res)=>{
+// app.post('/user',(req,res)=>{
     
-})
+// })
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
