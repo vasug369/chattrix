@@ -32,7 +32,7 @@ const updatePost = async (postId, data) => {
     }
 };
 
-const deletePost = async (postIwd) => {
+const deletePost = async (postId) => {
     try {
         return await Post.findByIdAndDelete(postId);
     } catch (error) {
@@ -40,8 +40,24 @@ const deletePost = async (postIwd) => {
     }
 };
 
+
+const getUserPosts=async(userId)=>{
+    try{
+        const posts=await Post.find({author: userId});
+        if(!posts){
+            throw new Error("No posts found for this user");
+        }
+        return posts;
+
+    }
+    catch(error){
+        throw new Error('Error fetching user posts: ' + error.message);
+    }
+}
+
 export const createPostService = createPost;
 export const getPostByIdService = getPostById;
 export const getPostsService = getAllPosts;
 export const updatePostService = updatePost;
 export const deletePostService = deletePost;
+export const getUserPostsService = getUserPosts;

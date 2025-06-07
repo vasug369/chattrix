@@ -20,6 +20,11 @@ const userSchema=new mongoose.Schema({
 
     },
 
+    pic:{
+        type:String,
+        default:"https://iconarchive.com/download/i107272/Flat-UI-Icons/User-Interface/user.ico"
+    },
+
     verifyOtp:{ 
         type:String,
         default:""

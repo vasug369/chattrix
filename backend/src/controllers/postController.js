@@ -4,6 +4,7 @@ import {
     getPostsService,
     updatePostService,
     deletePostService,
+    getUserPostsService
 } from '../services/postService.js';
 
 export const createPost = async (req, res) => {
@@ -26,9 +27,10 @@ export const getPosts = async (req, res) => {
 };
 
 export const getPostById = async (req, res) => {
+    // console.log('req.params:', req.params); // 👈 Add this
     try {
         const postId = req.params.id;
-        const post = await getPostById(postId);
+        const post = await getPostByIdService(postId);
         if (!post) {
             return res.status(404).json({ message: 'Post not found' });
         }
@@ -64,3 +66,52 @@ export const deletePost = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+
+export const getUserPosts=async (req, res) => {
+    console.log('req.user:', req.user); // 👈 Add this
+
+    try{
+        const userId=req.user._id; // Assuming user ID is stored in req.user
+        const posts=await getUserPostsService(userId);
+        if(!posts){
+            return res.status(404).json({message: "No posts found for this user"});
+        }
+        return res.status(200).json(posts);
+
+    }
+    catch(error){
+        return res.status(500).json({message: error.message});
+    }
+
+}
+
+
+export const likePost = async (req, res) => {
+    try {
+        const postId = req.params.postId;
+        const userId = req.user._id; // Assuming user ID is stored in req.user
+
+        // Find the post by ID
+        const post = await getPostByIdService(postId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Check if the user has already liked the post
+        if (post.likes.includes(userId)) {
+            // If the user has already liked the post, remove their like (dislike)
+            post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+            await post.save();
+            return res.status(200).json({ message: 'Post disliked successfully', post ,likes: post.likes});
+        }
+
+        // Add the user's ID to the likes array
+        post.likes.push(userId);
+        await post.save();
+
+        res.status(200).json({ message: 'Post liked successfully', post,likes: post.likes });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}

@@ -8,5 +8,4 @@ authRouter.get('/logout',logout);
 authRouter.get('/validate',validate);
 authRouter.get('/missing',validate);
 
-
 export default authRouter;
