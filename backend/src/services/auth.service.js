@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 import transporter from '../config/nodemailer.js';
 
-export const registerUser = async ({ name, email, password }) => {
+export const registerUser = async ({ name, email, password ,pic}) => {
     if (!name || !email || !password)
         return { status: 400, success: false, message: 'Missing details' };
 
@@ -13,7 +13,7 @@ export const registerUser = async ({ name, email, password }) => {
             return { status: 400, success: false, message: 'User already exists' };
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashedPassword });
+        const user = new User({ name, email, password: hashedPassword,pic });
 
         transporter.sendMail({
             from: process.env.SMTP_USER,

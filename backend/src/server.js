@@ -1,11 +1,14 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import connectDB from './config/dbConfig.js';
-import { login } from './controllers/authController.js';
-import authRouter from './routes/authRoutes.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+
+import authRouter from './routes/authRoutes.js';
 import postRouter from './routes/postRoutes.js';
+import userRouter from './routes/userRoutes.js';
+
+import { authMiddleware } from './middlewares/authMiddleware.js';
 
 connectDB();
 dotenv.config();
@@ -41,7 +44,12 @@ app.use(cors({
 }));
 
 app.use('/api/auth',authRouter);
-app.use('/api/post',postRouter);
+
+const protectedRoutes = express.Router();
+protectedRoutes.use('/post', postRouter);
+protectedRoutes.use('/user',userRouter)
+
+app.use('/api',authMiddleware,protectedRoutes);
 
 // // Basic route
 // app.get('/', (req, res) => {
