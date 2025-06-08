@@ -25,6 +25,16 @@ const userSchema=new mongoose.Schema({
         default:"https://iconarchive.com/download/i107272/Flat-UI-Icons/User-Interface/user.ico"
     },
 
+    followers:[{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"User"
+    }],
+
+    following:[{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"User"
+    }],
+
     verifyOtp:{ 
         type:String,
         default:""
