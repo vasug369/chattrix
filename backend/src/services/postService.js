@@ -55,9 +55,34 @@ const getUserPosts=async(userId)=>{
     }
 }
 
+const commentPost=async(req,postId)=>{
+    // console.log('postId:', postId); // Debugging line
+    // console.log('req.user:', req.user); // Debugging line
+    try{
+        const post = await Post.findById(postId);
+        console.log('post:', post); // Debugging line
+        if (!post) {
+            throw new Error('Post not found');
+        }
+        post.comments.push({
+            author:req.user._id,
+            content: req.body.content 
+        })
+        post.save();
+        return post;
+
+    }
+    catch(err){
+        throw new Error('error commenting on post: '+err.message);
+
+    }
+
+}
+
 export const createPostService = createPost;
 export const getPostByIdService = getPostById;
 export const getPostsService = getAllPosts;
 export const updatePostService = updatePost;
 export const deletePostService = deletePost;
 export const getUserPostsService = getUserPosts;
+export const commentPostService = commentPost;

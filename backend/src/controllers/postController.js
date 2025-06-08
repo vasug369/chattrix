@@ -4,7 +4,8 @@ import {
     getPostsService,
     updatePostService,
     deletePostService,
-    getUserPostsService
+    getUserPostsService,
+    commentPostService
 } from '../services/postService.js';
 
 export const createPost = async (req, res) => {
@@ -114,4 +115,21 @@ export const likePost = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+}
+
+
+
+export const commentPost=async(req,res)=>{
+    try{
+        const postId=req.params.postId;
+        const post=await commentPostService(req,postId);
+        if(!post){
+            res.status(404).json({message:"no post found"});
+        }
+        res.status(200).json(post);
+    }
+    catch(err){
+        return res.status(500).json(err);
+    }
+
 }
