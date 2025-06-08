@@ -1,6 +1,6 @@
 import express from 'express';
 // const { createPost, getPosts, getPostById, updatePost, deletePost } = require('../controllers/postController');
-import { createPost, getPosts, getPostById, updatePost, deletePost, getUserPosts ,likePost} from '../controllers/postController.js';
+import { createPost, getPosts, getPostById, updatePost, deletePost, getUserPosts ,likePost,commentPost} from '../controllers/postController.js';
 const postRouter = express.Router();
 
 // Route to create a new post
@@ -29,6 +29,10 @@ postRouter.put('/update/:id', updatePost);
 
 //like a post by ID
 postRouter.put('/:postId/like', likePost);
+
+
+//comment ona post by ID
+postRouter.post('/:postId/comment', commentPost);
 
 // Route to delete a post by ID
 postRouter.delete('/:id', deletePost);
