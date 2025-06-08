@@ -17,7 +17,7 @@ export const authMiddleware = async (req, res, next) => {
     // console.log('Decoded JWT:', decoded);
 
     req.user = await User.findById(decoded.id).select('-password');
-    // console.log('User from DB:', user);
+    // console.log('User from DB:', req.user);
 
     next();
   } catch (error) {
