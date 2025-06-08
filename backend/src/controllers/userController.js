@@ -36,7 +36,7 @@ export const getUserPost=(req,res)=>{
 
 export const updateUser=async(req,res)=>{
     try{
-        const userId=req.params.followUserId;
+        const userId=req.params.id;
         const updateData=req.body;
         // Assuming you have a service function to update the user
         const updatedUser=await updateUserService(userId, updateData);
