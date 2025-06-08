@@ -5,7 +5,9 @@ import {
     updatePostService,
     deletePostService,
     getUserPostsService,
-    commentPostService
+    commentPostService,
+    feedPostsService,
+    searchPostsService
 } from '../services/postService.js';
 
 export const createPost = async (req, res) => {
@@ -71,20 +73,20 @@ export const deletePost = async (req, res) => {
 };
 
 
-export const getUserPosts=async (req, res) => {
+export const getUserPosts = async (req, res) => {
     console.log('req.user:', req.user); // 👈 Add this
 
-    try{
-        const userId=req.user._id; // Assuming user ID is stored in req.user
-        const posts=await getUserPostsService(userId);
-        if(!posts){
-            return res.status(404).json({message: "No posts found for this user"});
+    try {
+        const userId = req.user._id; // Assuming user ID is stored in req.user
+        const posts = await getUserPostsService(userId);
+        if (!posts) {
+            return res.status(404).json({ message: "No posts found for this user" });
         }
         return res.status(200).json(posts);
 
     }
-    catch(error){
-        return res.status(500).json({message: error.message});
+    catch (error) {
+        return res.status(500).json({ message: error.message });
     }
 
 }
@@ -106,14 +108,14 @@ export const likePost = async (req, res) => {
             // If the user has already liked the post, remove their like (dislike)
             post.likes = post.likes.filter(id => id.toString() !== userId.toString());
             await post.save();
-            return res.status(200).json({ message: 'Post disliked successfully', post ,likes: post.likes});
+            return res.status(200).json({ message: 'Post disliked successfully', post, likes: post.likes });
         }
 
         // Add the user's ID to the likes array
         post.likes.push(userId);
         await post.save();
 
-        res.status(200).json({ message: 'Post liked successfully', post,likes: post.likes });
+        res.status(200).json({ message: 'Post liked successfully', post, likes: post.likes });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -121,17 +123,54 @@ export const likePost = async (req, res) => {
 
 
 
-export const commentPost=async(req,res)=>{
-    try{
-        const postId=req.params.postId;
-        const post=await commentPostService(req,postId);
-        if(!post){
-            res.status(404).json({message:"no post found"});
+export const commentPost = async (req, res) => {
+    try {
+        const postId = req.params.postId;
+        const post = await commentPostService(req, postId);
+        if (!post) {
+            res.status(404).json({ message: "no post found" });
         }
         res.status(200).json(post);
     }
-    catch(err){
-        return res.status(500).json(err);
+    catch (err) {
+        return res.status(500).json(err.message);
     }
 
+}
+
+
+export const feedPosts = async (req, res) => {
+    try {
+
+        const userId = req.user._id;
+        const feed = await feedPostsService(userId);
+        if (!feed) {
+            return res.status(404).json("feed not found");
+        }
+        console.log(feed);
+        return res.status(200).json(feed);
+    }
+    catch (err) {
+        return res.status(500).json(err.message);
+    }
+}
+
+export const searchPosts = async (req, res) => {
+    // console.log('Search query:', req.query.q); // Debugging line
+    try{
+        const searchQuery = req.query.q; // Assuming the search query is passed as a query parameter
+        if (!searchQuery) {
+            return res.status(400).json({ message: 'Search query is required' });
+        }
+
+        const posts = await searchPostsService(searchQuery);
+        if (!posts || posts.length === 0) {
+            return res.status(404).json({ message: 'No posts found' });
+        }
+
+        return res.status(200).json(posts);
+    }
+    catch (err) {
+        return res.status(500).json(err.message);
+    }
 }

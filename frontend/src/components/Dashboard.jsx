@@ -1,107 +1,313 @@
-import axios from 'axios'
-import React, { useEffect, useState } from 'react'
+import axios from 'axios';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState([]);
+
   useEffect(() => {
-    axios.get('http://localhost:3000/api/post/currentUser', {
-      withCredentials: true
+    axios.get('http://localhost:3000/api/post/feed', {
+      withCredentials: true,
     })
     .then((res) => {
-      // console.log("Response:", res);
-      setData(res.data);
-      console.log("data fetched successfully");
-      console.log("User data:", res.data);
-      // console.log(res);
+      // Assuming res.data is array of posts, each post has author info including follow status
+      const allPosts = res.data
+        .filter(Array.isArray)
+        .flat()
+        .filter(post => post._id);
+      setData(allPosts);
     })
     .catch((err) => {
       console.log(err);
       navigate('/');
     });
-  }
-  , []);
+  }, []);
+
+  // Flying heart animation function
+  const showHeart = (e) => {
+    const heart = document.createElement('div');
+    heart.innerText = '❤️';
+    heart.className = 'flying-heart';
+    heart.style.left = `${e.clientX - 10}px`;
+    heart.style.top = `${e.clientY - 20}px`;
+    document.body.appendChild(heart);
+
+    setTimeout(() => {
+      heart.remove();
+    }, 1000);
+  };
+
+  // Toggle follow/unfollow for author
+  const toggleFollow = async (authorId, currentlyFollowing) => {
+    try {
+      const url = `http://localhost:3000/api/user/${authorId}/${currentlyFollowing ? 'unfollow' : 'follow'}`;
+      await axios.put(url, {}, { withCredentials: true });
+      // Update data to reflect follow/unfollow
+      setData((prevData) =>
+        prevData.map((post) =>
+          post.author._id === authorId
+            ? { ...post, author: { ...post.author, isFollowing: !currentlyFollowing } }
+            : post
+        )
+      );
+    } catch (error) {
+      console.log('Follow/unfollow error:', error);
+    }
+  };
+
+  const styles = {
+    container: {
+      fontFamily: 'Arial, sans-serif',
+      backgroundColor: '#f5f5f5',
+      minHeight: '100vh',
+      padding: '20px',
+      display: 'flex',
+      gap: '20px',
+    },
+    leftSidebar: {
+      flex: '0 0 220px',
+      backgroundColor: '#fff',
+      borderRadius: '10px',
+      padding: '20px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+      height: 'fit-content',
+      position: 'sticky',
+      top: '20px',
+      alignSelf: 'flex-start',
+    },
+    middleContent: {
+      flex: '1 1 auto',
+      overflowY: 'auto',
+      maxHeight: '90vh',
+    },
+    rightSidebar: {
+      flex: '0 0 280px',
+      backgroundColor: '#fff',
+      borderRadius: '10px',
+      padding: '20px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+      height: 'fit-content',
+      position: 'sticky',
+      top: '20px',
+      alignSelf: 'flex-start',
+    },
+    navItem: {
+      marginBottom: '15px',
+      cursor: 'pointer',
+      fontWeight: '600',
+      color: '#333',
+      userSelect: 'none',
+    },
+    recommendationItem: {
+      marginBottom: '12px',
+      padding: '8px',
+      borderBottom: '1px solid #ddd',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    logoutBtn: {
+      padding: '8px 16px',
+      backgroundColor: '#ff4d4d',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    },
+    postCard: {
+      marginBottom: '20px',
+      backgroundColor: '#fff',
+      borderRadius: '10px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+      padding: '20px',
+    },
+    title: {
+      fontSize: '22px',
+      fontWeight: 'bold',
+      marginBottom: '10px',
+      color: '#333',
+    },
+    content: {
+      fontSize: '16px',
+      marginBottom: '10px',
+      color: '#555',
+    },
+    meta: {
+      fontSize: '14px',
+      color: '#777',
+      marginBottom: '10px',
+    },
+    button: {
+      padding: '6px 12px',
+      marginRight: '10px',
+      backgroundColor: '#007bff',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    },
+    dislikeButton: {
+      padding: '6px 12px',
+      backgroundColor: '#6c757d',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+      marginRight: '10px',
+    },
+    followButton: {
+      padding: '6px 12px',
+      backgroundColor: '#28a745',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    },
+    unfollowButton: {
+      padding: '6px 12px',
+      backgroundColor: '#dc3545',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    },
+  };
 
   return (
-    <div>
-      <h1>Welcome to the Dashboard</h1>
-      <button
-        style={{ cursor: 'pointer' }}
-        onClick={() => {
-          axios
-            .get('http://localhost:3000/api/auth/logout', {
-              withCredentials: true,
-            })
-            .then((res) => {
-              console.log(res);
-              navigate('/');
-            })
-            .catch((err) => {
-              console.log(err);
-            });
-        }}
-      >
-        Logout
-      </button>
-      <div>
-        <h2>User Data:</h2>
+    <div style={styles.container}>
+      <style>{`
+        .flying-heart {
+          position: fixed;
+          font-size: 24px;
+          animation: floatUp 1s ease-out forwards;
+          pointer-events: none;
+          z-index: 9999;
+        }
+        @keyframes floatUp {
+          0% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-100px);
+          }
+        }
+      `}</style>
+
+      {/* Left Sidebar */}
+      <div style={styles.leftSidebar}>
+        <h2>Menu</h2>
+        <div style={styles.navItem} onClick={() => navigate('/dashboard')}>🏠 Home</div>
+        <div style={styles.navItem} onClick={() => navigate('/create-post')}>✍️ Create Post</div>
+        <div style={styles.navItem} onClick={() => navigate('/messages')}>💬 Messages</div>
+        <div style={styles.navItem} onClick={() => navigate('/more')}>☰ More</div>
+      </div>
+
+      {/* Middle Main Feed */}
+      <div style={styles.middleContent}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1>📋 Dashboard</h1>
+          <button
+            style={styles.logoutBtn}
+            onClick={() => {
+              axios
+                .get('http://localhost:3000/api/auth/logout', { withCredentials: true })
+                .then((res) => {
+                  console.log(res);
+                  navigate('/');
+                })
+                .catch((err) => {
+                  console.log(err);
+                });
+            }}
+          >
+            Logout
+          </button>
+        </div>
+
+        <h2>User Feed:</h2>
         {data.length > 0 ? (
           data.map((item) => (
-            <div key={item._id} style={{ border: '1px solid #ccc', margin: '10px', padding: '10px' }}>
-              <h3>{item.title}</h3>
-              <p>{item.content}</p>
-              <p><strong>Author:</strong> {item.author}</p>
-              <p><strong>Likes:</strong> {item.likes.length}</p>
-              <p><strong>Comments:</strong> {item.comments.length}</p>
-              <p><strong>Created At:</strong> {new Date(item.createdAt).toLocaleString()}</p>
-              <button
-                style={{ cursor: 'pointer', marginRight: '10px' }} 
-                onClick={async() => {
-                  await axios
-                    .put(`http://localhost:3000/api/post/${item._id}/like`, {},{ withCredentials: true })
-                    .then((res) => {
-                      setData((prevData) =>
-                        prevData.map((post) =>
-                          post._id === item._id ? { ...post, likes: res.data.likes } : post
-                        )
-                      );
-                    })
-                    .catch((err) => {
-                      console.log(err);
-                    });
-                }}
-              >
-                Like ({item.likes.length})
-              </button>
-              <button
-                style={{ cursor: 'pointer' }}
-                onClick={async() => {
-                  await axios
-                  .put(`http://localhost:3000/api/post/${item._id}/like`, {}, { withCredentials: true })
-                  
-                  .then((res) => {
-                      setData((prevData) =>
-                        prevData.map((post) =>
-                          post._id === item._id ? { ...post, likes: res.data.likes } : post
-                        )
-                      );
-                    })
-                    .catch((err) => {
-                      console.log(err);
-                    });
-                }}
-              >
-                Dislike
-              </button>
+            <div key={item._id} style={styles.postCard}>
+              <div style={styles.title}>{item.title}</div>
+              <div style={styles.content}>{item.content}</div>
+              <div style={styles.meta}>
+                <p><strong>Author Name:</strong> {item.author.name}</p>
+                <button
+                  style={item.author.isFollowing ? styles.unfollowButton : styles.followButton}
+                  onClick={() => toggleFollow(item.author._id, item.author.isFollowing)}
+                >
+                  {item.author.isFollowing ? 'Unfollow' : 'Follow'}
+                </button>
+                <p><strong>Likes:</strong> {item.likes.length} | <strong>Comments:</strong> {item.comments.length}</p>
+                <p><strong>Created:</strong> {new Date(item.createdAt).toLocaleString()}</p>
+              </div>
+              <div>
+                <button
+                  style={styles.button}
+                  onClick={async (e) => {
+                    showHeart(e);
+                    await axios
+                      .put(`http://localhost:3000/api/post/${item._id}/like`, {}, { withCredentials: true })
+                      .then((res) => {
+                        setData((prevData) =>
+                          prevData.map((post) =>
+                            post._id === item._id ? { ...post, likes: res.data.likes } : post
+                          )
+                        );
+                      })
+                      .catch((err) => {
+                        console.log(err);
+                      });
+                  }}
+                >
+                  ❤️ Like ({item.likes.length})
+                </button>
+                <button
+                  style={styles.dislikeButton}
+                  onClick={async () => {
+                    await axios
+                      .put(`http://localhost:3000/api/post/${item._id}/like`, {}, { withCredentials: true })
+                      .then((res) => {
+                        setData((prevData) =>
+                          prevData.map((post) =>
+                            post._id === item._id ? { ...post, likes: res.data.likes } : post
+                          )
+                        );
+                      })
+                      .catch((err) => {
+                        console.log(err);
+                      });
+                  }}
+                >
+                  👎 Dislike
+                </button>
+              </div>
             </div>
           ))
         ) : (
           <p>No data available</p>
         )}
       </div>
+
+      {/* Right Sidebar */}
+      <div style={styles.rightSidebar}>
+        <h2>Recommendations</h2>
+        {/* Example top accounts to follow */}
+        <div style={styles.recommendationItem}>
+          <p><strong>John Doe</strong></p>
+          <button style={styles.followButton}>Follow</button>
+        </div>
+        <div style={styles.recommendationItem}>
+          <p><strong>Jane Smith</strong></p>
+          <button style={styles.followButton}>Follow</button>
+        </div>
+        {/* Add more recommendation logic here */}
+      </div>
     </div>
   );
 }
 
-export default Dashboard
+export default Dashboard;
