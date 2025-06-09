@@ -7,7 +7,7 @@ const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null); // null means "loading"
 
   useEffect(() => {
-    axios.get('http://localhost:3000/api/auth/validate', { withCredentials: true })
+    axios.get(`${baseURL}/api/auth/validate`, { withCredentials: true })
       .then((res) => {
         setIsAuthenticated(res.data.authenticated); // expects `authenticated: true` from backend
       })
