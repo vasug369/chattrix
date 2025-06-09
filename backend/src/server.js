@@ -39,7 +39,7 @@ app.use(cookieParser());
 // const allowlist = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
 
 app.use(cors({
-    origin:'https://chattrix-lake.vercel.app/',
+    origin:'https://chattrix-o3xb9yl2h-vasu-guptas-projects.vercel.app',
     credentials:true
 }));
 
