@@ -63,6 +63,8 @@ app.use('/api',authMiddleware,protectedRoutes);
     
 // })
 // Start the server
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
