@@ -3,9 +3,10 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 
 export const authMiddleware = async (req, res, next) => {
-
+  console.log(req); // Debugging line to check if middleware is called
+  console.log(req.cookies); // Debugging line to check cookies
   try {
-    // console.log(req.cookies);
+    console.log(req.cookies);
     
     const token = req.cookies.token;
     // console.log("Token from cookies:", token);

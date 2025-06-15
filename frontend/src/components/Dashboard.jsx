@@ -3,7 +3,7 @@
   import { useNavigate } from 'react-router-dom';
 
 
-  const baseURL= 'http://localhost:3000'; // Update with your backend URL
+  const baseURL= 'http://localhost:3000';
 
   function Dashboard() {
     const navigate = useNavigate();
@@ -48,7 +48,7 @@
 
     const toggleFollow = async (authorId, currentlyFollowing) => {
       try {
-        const url = `${baseURL}/api/user/${authorId}/${currentlyFollowing ? 'unfollow' : 'follow'}`;
+        const url = `${baseURL}/api/user/${authorId}/${currentlyFdollowing ? 'unfollow' : 'follow'}`;
         await axios.put(url, {}, { withCredentials: true });
         setData((prevData) =>
           prevData.map((post) =>

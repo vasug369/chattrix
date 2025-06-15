@@ -1,4 +1,3 @@
-import e from 'express';
 import {getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService} from '../services/userService.js'
 
 

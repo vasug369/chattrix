@@ -62,6 +62,8 @@ export const loginUser = async ({ email, password }, res) => {
             sameSite: 'Lax',
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
+        // console.log('Token set in cookie:', token);
+        // console.log(res.cookies.token);
 
         return { status: 200, success: true, message: 'Logged in successfully' };
     } catch (err) {
