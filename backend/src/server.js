@@ -39,7 +39,7 @@ app.use(cookieParser());
 // const allowlist = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
 
 app.use(cors({
-    origin:'https://chattrix-9vyw-git-feature-auth-vasu-guptas-projects.vercel.app',
+    origin:'http://localhost:5173', // Replace with your frontend URL
     credentials:true
 }));
 

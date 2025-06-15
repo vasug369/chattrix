@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const baseURL= 'https://chattrix-2.onrender.com';
+const baseURL= 'http://localhost:3000';
 
 
 const ProtectedRoute = ({ children }) => {

@@ -4,7 +4,7 @@ import email_icon from '../assets/email_icon.png';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const BASE_URL = 'https://chattrix-2.onrender.com';
+const BASE_URL = 'http://localhost:3000';
 
 function Login() {
     const [step, setStep] = useState('email');
