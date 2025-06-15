@@ -100,6 +100,7 @@ const commentPost = async (req, postId) => {
 
 const feedPosts = async (userId) => {
     // console.log(userId);
+    console.log("herer :",req.cookies.token); // Debugging line
     try {
         const user = await User.findById(userId).populate('following','_id');
         // user.forEach(element => {

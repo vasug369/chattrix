@@ -17,19 +17,19 @@ function Login() {
     const navigate = useNavigate();
 
 
-    useEffect(() => {
-        axios.get(`${BASE_URL}/api/auth/validate`, {
-            withCredentials: true
-        })
-            .then((res) => {
-                if (res.data.authenticated) {
-                    navigate('/dashboard');
-                }
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    }, []);
+    // useEffect(() => {
+    //     axios.get(`${BASE_URL}/api/auth/validate`, {
+    //         withCredentials: true
+    //     })
+    //         .then((res) => {
+    //             if (res.data.authenticated) {
+    //                 navigate('/dashboard');
+    //             }
+    //         })
+    //         .catch((err) => {
+    //             console.log(err);
+    //         });
+    // }, [handleLogin]);
 
     const handleRegister = async () => {
         try {
@@ -53,6 +53,7 @@ function Login() {
             }, {
                 withCredentials: true
             });
+            console.log('Login successful');
 
             navigate('/dashboard');
         } catch (err) {

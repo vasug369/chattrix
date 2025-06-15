@@ -39,11 +39,11 @@ app.use(cookieParser());
 // const allowlist = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
 
 app.use(cors({
-    origin:'http://localhost:5173', // Replace with your frontend URL
+    origin:'http://localhost:5173',
     credentials:true
 }));
 
-app.use('/api/auth',authRouter);
+app.use('/api/auth',authRouter);    
 
 const protectedRoutes = express.Router();
 protectedRoutes.use('/post', postRouter);
