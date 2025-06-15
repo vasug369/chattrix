@@ -3,7 +3,7 @@
   import { useNavigate } from 'react-router-dom';
 
 
-  const baseURL= 'https://chattrix-2.onrender.com';
+  const baseURL= 'http://localhost:3000'; // Update with your backend URL
 
   function Dashboard() {
     const navigate = useNavigate();
