@@ -96,3 +96,17 @@ export const deleteUserService = async (userId) => {
         throw new Error('Error deleting user: ' + error.message);
     }
 }
+
+export const getAllUsersService = async () => {
+    try {
+        const users = await User.find({});
+        if (!users || users.length === 0) {
+            throw new Error('No users found');
+        }
+        return users;
+    } catch (error) {
+        throw new Error('Error fetching all users: ' + error.message);
+    }
+}
+
+
