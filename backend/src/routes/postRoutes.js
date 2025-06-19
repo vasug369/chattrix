@@ -29,9 +29,6 @@ postRouter.get('/', getPosts);
 postRouter.get('/:id', getPostById);
 
 
-
-
-
 // Route to update a post by ID
 postRouter.put('/update/:id', updatePost);
 

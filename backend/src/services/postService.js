@@ -78,13 +78,18 @@ const commentPost = async (req, postId) => {
     // console.log('req.user:', req.user); // Debugging line
     try {
         const post = await Post.findById(postId);
+        const comment_username= await User.findById(req.user._id, 'name');
+        if (!comment_username) {
+            throw new Error('User not found');
+        }
         console.log('post:', post); // Debugging line
         if (!post) {
             throw new Error('Post not found');
         }
         post.comments.push({
             author: req.user._id,
-            content: req.body.content
+            content: req.body.content,
+            name: comment_username.name
         })
         post.save();
         return post;
@@ -100,7 +105,6 @@ const commentPost = async (req, postId) => {
 
 const feedPosts = async (userId) => {
     // console.log(userId);
-    console.log("herer :",req.cookies.token); // Debugging line
     try {
         const user = await User.findById(userId).populate('following','_id');
         // user.forEach(element => {

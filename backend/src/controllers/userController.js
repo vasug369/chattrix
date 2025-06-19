@@ -1,4 +1,4 @@
-import {getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService} from '../services/userService.js'
+import {getAllUsersService,getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService} from '../services/userService.js'
 
 
 export const getUser=async(req,res)=>{
@@ -93,6 +93,21 @@ export const deleteUser=async(req,res)=>{
             return res.status(404).json({message:"user not found"})
         }
         res.status(200).json({message:"user deleted successfully"});
+
+    }
+    catch(err){
+        return res.status(500).json({message:err.message});
+    }
+}
+
+export const getAllUsers = async (req, res) => {
+    try{
+
+        const users=await getAllUsersService(); // Assuming you have a service function to get all users
+        if(!users || users.length === 0){
+            return res.status(404).json({message:"No users found"})
+        }
+        res.status(200).json(users);
 
     }
     catch(err){

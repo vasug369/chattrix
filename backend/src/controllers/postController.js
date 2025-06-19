@@ -126,6 +126,7 @@ export const likePost = async (req, res) => {
 export const commentPost = async (req, res) => {
     try {
         const postId = req.params.postId;
+        console.log('postId:', postId); // Debugging line
         const post = await commentPostService(req, postId);
         if (!post) {
             res.status(404).json({ message: "no post found" });

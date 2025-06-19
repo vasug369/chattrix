@@ -45,7 +45,11 @@ comments: [
         createdAt:{
             type:Date,
             default:Date.now(),
-        }
+        },
+        name: {
+            type: String,
+            trim: true,
+        },
 
 
 

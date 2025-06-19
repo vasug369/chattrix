@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import authRouter from './routes/authRoutes.js';
 import postRouter from './routes/postRoutes.js';
 import userRouter from './routes/userRoutes.js';
+import profileRouter from './routes/profileRouter.js';
 
 import { authMiddleware } from './middlewares/authMiddleware.js';
 
@@ -39,31 +40,25 @@ app.use(cookieParser());
 // const allowlist = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
 
 app.use(cors({
-    origin:'http://localhost:5173',
-    credentials:true
+    origin: 'http://localhost:5173',
+    credentials: true
 }));
 
-app.use('/api/auth',authRouter);    
 
+//public route
+app.use('/api/auth', authRouter);
+
+
+//protected/private route
 const protectedRoutes = express.Router();
 protectedRoutes.use('/post', postRouter);
-protectedRoutes.use('/user',userRouter)
-
-app.use('/api',authMiddleware,protectedRoutes);
-
-// // Basic route
-// app.get('/', (req, res) => {
-//     res.send('Welcome to the backend server!');
-// });
-
-// app.post('/login',login);
+protectedRoutes.use('/user', userRouter)
+protectedRoutes.use('/myProfile', profileRouter);
 
 
-// app.post('/user',(req,res)=>{
-    
-// })
-// Start the server
-console.log('NODE_ENV:', process.env.NODE_ENV);
+app.use('/api', authMiddleware, protectedRoutes);
+
+// console.log('NODE_ENV:', process.env.NODE_ENV);
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
