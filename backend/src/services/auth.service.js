@@ -3,71 +3,123 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 import transporter from '../config/nodemailer.js';
 
-export const registerUser = async ({ name, email, password ,pic}) => {
-    if (!name || !email || !password)
-        return { status: 400, success: false, message: 'Missing details' };
+export const registerUser = async ({ name, email, password, pic }, res) => {
+    if (!name || !email || !password) {
+        return res.status(400).json({
+            status: 400,
+            success: false,
+            message: 'Missing details'
+        });
+    }
 
     try {
         const existingUser = await User.findOne({ email });
-        if (existingUser)
-            return { status: 400, success: false, message: 'User already exists' };
+        if (existingUser) {
+            return res.status(400).json({
+                status: 400,
+                success: false,
+                message: 'User already exists'
+            });
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashedPassword,pic });
+        const user = new User({ name, email, password: hashedPassword, pic });
 
         transporter.sendMail({
             from: process.env.SMTP_USER,
             to: email,
             subject: 'Welcome to Our Service',
             text: `Hello ${name},\n\nThank you for registering with us! We're excited to have you on board.\n\nBest regards,\nThe Team`
-        })
-            .catch(err => console.error('Error sending welcome email:', err));
+        }).catch(err => console.error('Error sending welcome email:', err));
 
-        User.verifyOtp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate a 6-digit OTP
-        User.verifyOtpExpireAt = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
-        User.isAccountVerified = false; // Initially set to false
-        User.resetOtp = '';
-        User.resetOtpExpireAt = 0; // Initially set to 0
-        User.createdAt = Date.now(); // Set createdAt to current time
+        user.verifyOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.verifyOtpExpireAt = Date.now() + 10 * 60 * 1000;
+        user.isAccountVerified = false;
+        user.resetOtp = '';
+        user.resetOtpExpireAt = 0;
+        user.createdAt = Date.now();
 
         await user.save();
 
-        return { status: 201, success: true, message: 'User registered' };
+        return res.status(201).json({
+            status: 201,
+            success: true,
+            message: 'User registered successfully'
+        });
     } catch (err) {
-        return { status: 500, success: false, message: 'Server error' };
+        return res.status(500).json({
+            status: 500,
+            success: false,
+            message: 'Server error'
+        });
     }
 };
 
 export const loginUser = async ({ email, password }, res) => {
-
     if (!email || !password) {
-        return { status: 400, success: false, message: 'Missing details' };
+        return res.status(400).json({
+            status: 400,
+            success: false,
+            message: 'Missing details'
+        });
     }
 
     try {
-
         const user = await User.findOne({ email });
-        if (!user)
-            return { status: 400, success: false, message: 'Invalid email' };
-        
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch)
-            return { status: 400, success: false, message: 'Invalid password' };
+        if (!user) {
+            return res.status(400).json({
+                status: 400,
+                success: false,
+                message: 'Invalid email'
+            });
+        }
 
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({
+                status: 400,
+                success: false,
+                message: 'Invalid password'
+            });
+        }
+
+        const token = jwt.sign({ id: user._id ,name:user.name,email:user.email}, process.env.JWT_SECRET, { expiresIn: '15m' });
+        const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'Lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            maxAge: 15 * 60 * 1000 // 15 min
         });
-        // console.log('Token set in cookie:', token);
-        // console.log(res.cookies.token);
 
-        return { status: 200, success: true, message: 'Logged in successfully' };
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        }
+
+        )
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: 'Logged in successfully',
+            data: {
+                token,
+                "name":user.name,
+                "email":user.email,
+                "id":user._id
+
+            }
+        });
     } catch (err) {
-        return { status: 500, success: false, message: 'Server error' };
+        return res.status(500).json({
+            status: 500,
+            success: false,
+            message: 'Server error'
+        });
     }
 };
 
@@ -78,41 +130,80 @@ export const logoutUser = async (res) => {
         sameSite: 'Lax'
     });
 
-    return { status: 200, success: true, message: 'Logged out' };
+    return res.status(200).json({
+        status: 200,
+        success: true,
+        message: 'Logged out'
+    });
 };
 
-export const validateToken = async (token) => {
-    if (!token)
-        return { status: 401, success: false, message: 'No token' };
+
+
+export const refreshAccessToken = async (req, res) => {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+        return res.status(401).json({
+            status: 401,
+            success: false,
+            message: 'No refresh token'
+        });
+    }
 
     try {
-        jwt.verify(token, process.env.JWT_SECRET);
-        return { status: 200, authenticated: true };
-    } catch {
-        return { status: 403, success: false, message: 'Invalid token' };
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+
+        // You may also verify token existence in DB if storing refresh tokens there
+
+        const newAccessToken = jwt.sign(
+            { id: decoded.id },
+            process.env.JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+
+        res.cookie('accessToken', newAccessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            maxAge: 15 * 60 * 1000
+        });
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            message: 'Access token refreshed'
+        });
+    } catch (err) {
+        return res.status(403).json({
+            status: 403,
+            success: false,
+            message: 'Invalid refresh token'
+        });
     }
 };
 
-// export const initializeFields = async () => {
-//     try {
-//         const result = await User.updateMany(
-//             {},
-//             {
-//                 $set: {
-//                     verifyOtp: '',
-//                     verifyOtpExpireAt: 0,
-//                     isAccountVerified: false,
-//                     resetOtp: '',
-//                     resetOtpExpireAt: 0
-//                 }
-//             }
-//         );
-//         return {
-//             status: 200,
-//             success: true,
-//             message: `Fields initialized for ${result.modifiedCount} users`
-//         };
-//     } catch (err) {
-//         return { status: 500, success: false, message: err.message };
-//     }
-// };
+
+export const validateToken = async (token, res) => {
+    if (!token) {
+        return res.status(401).json({
+            status: 401,
+            success: false,
+            message: 'No token'
+        });
+    }
+
+    try {
+        jwt.verify(token, process.env.JWT_SECRET);
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            authenticated: true
+        });
+    } catch {
+        return res.status(403).json({
+            status: 403,
+            success: false,
+            message: 'Invalid token'
+        });
+    }
+};
