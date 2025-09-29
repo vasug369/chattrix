@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 
 import authRouter from './routes/authRoutes.js';
 import postRouter from './routes/postRoutes.js';
-import userRouter from './routes/userRoutes.js';
+import userRouter from './routes/userRoutes.js';    
 import profileRouter from './routes/profileRouter.js';
 
 import { authMiddleware } from './middlewares/authMiddleware.js';
