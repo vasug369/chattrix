@@ -48,7 +48,7 @@
 
     const toggleFollow = async (authorId, currentlyFollowing) => {
       try {
-        const url = `${baseURL}/api/user/${authorId}/${currentlyFdollowing ? 'unfollow' : 'follow'}`;
+        const url = `${baseURL}/api/user/${authorId}/${currentlyFollowing ? 'unfollow' : 'follow'}`;
         await axios.put(url, {}, { withCredentials: true });
         setData((prevData) =>
           prevData.map((post) =>

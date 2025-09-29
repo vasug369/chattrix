@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import image from '../assets/download.png';
 import email_icon from '../assets/email_icon.png';
-import { useNavigate } from 'react-router-dom';
+import { data, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const BASE_URL = 'http://localhost:3000';
@@ -47,13 +47,18 @@ function Login() {
 
     const handleLogin = async () => {
         try {
-            await axios.post(`${BASE_URL}/api/auth/login`, {
+            const resposne=await axios.post(`${BASE_URL}/api/auth/login`, {
                 email,
                 password
             }, {
                 withCredentials: true
             });
             console.log('Login successful');
+            // console.log(resposne.data);
+            localStorage.setItem('token',resposne.data.data.token);
+            localStorage.setItem('name',resposne.data.data.name);
+            localStorage.setItem('email',resposne.data.data.email); 
+            localStorage.setItem('id',resposne.data.data.id);
 
             navigate('/dashboard');
         } catch (err) {
