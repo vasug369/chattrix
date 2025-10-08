@@ -8,7 +8,7 @@ const FollowButton = ({ targetUserId }) => {
   useEffect(() => {
     const checkFollow = async () => {
       try {
-        const res = await axios.get(`/api/user/is-following/${targetUserId}`, {
+        const res = await axios.get(`/api/user/isFollowing/${targetUserId}`, {
           withCredentials: true
         });
         setIsFollowed(res.data.isFollowing);
