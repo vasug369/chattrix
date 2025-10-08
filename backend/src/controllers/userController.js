@@ -1,4 +1,4 @@
-import {getAllUsersService,getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService} from '../services/userService.js'
+import {getAllUsersService,getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService,getIsFollowingService} from '../services/userService.js'
 
 
 export const getUser=async(req,res)=>{
@@ -114,3 +114,17 @@ export const getAllUsers = async (req, res) => {
         return res.status(500).json({message:err.message});
     }
 }
+
+
+export const getIsFollowing = async(req, res) => {
+    const targetUserId=req.params.targetUserId;
+    if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const isFollowing=await getIsFollowingService( req.user._id,targetUserId);
+
+    return res.status(200).json({
+        isFollowing:isFollowing
+    });
+};
