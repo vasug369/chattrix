@@ -1,5 +1,5 @@
 import express from "express";
-import {deleteUser, followUser, getUser,unfollowUser,updateUser,getAllUsers} from '../controllers/userController.js';
+import {deleteUser, followUser, getUser,getIsFollowing,unfollowUser,updateUser,getAllUsers} from '../controllers/userController.js';
 const userRouter = express.Router();
 
 userRouter.get('/getAllUsers',getAllUsers);
@@ -11,6 +11,7 @@ userRouter.get('/me',(req, res) => {
         // ...anything else you want
     });
 });
+userRouter.get('/isFollowing/:targetUserId',getIsFollowing);
 userRouter.get('/:id',getUser);
 
 userRouter.put('/:followUserId/follow',followUser); // Assuming you want to follow a user, you can implement the logic in the controller

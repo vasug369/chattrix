@@ -90,7 +90,7 @@ export const loginUser = async ({ email, password }, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'Lax',
-            maxAge: 15 * 60 * 1000 // 15 min
+            maxAge: 24 * 60 *60* 1000 // 15 min
         });
 
         res.cookie('refreshToken', refreshToken, {

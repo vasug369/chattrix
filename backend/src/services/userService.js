@@ -110,3 +110,20 @@ export const getAllUsersService = async () => {
 }
 
 
+export const getIsFollowingService=async(currentUserId,targetUserId)=>{
+    try{
+        const targetUser = await User.findById(targetUserId).select('followers');
+        // const isFollowing=(await User.find(targetUserId)).includes()
+        const followersAsString = targetUser?.followers.map(id => id.toString());
+        const currentIdStr = currentUserId.toString();
+
+        // console.log(targetUser.followers);
+        // console.log(typeof(currentUserId));
+        return followersAsString?.includes(currentIdStr);;
+    }
+    catch(error){
+        throw new Error(error.message);
+
+    }
+}
+
