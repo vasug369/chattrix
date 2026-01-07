@@ -32,7 +32,7 @@ const updatePost = async (postId, data) => {
     }
 };
 
-const deletePost = async (postIwd) => {
+const deletePost = async (postId) => {
     try {
         return await Post.findByIdAndDelete(postId);
     } catch (error) {

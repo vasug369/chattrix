@@ -6,6 +6,8 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+    console.log(req.headers['content-type']);
+    console.log("asdfasdasdasdasdasd");
     const result = await loginUser(req.body, res); // Pass `res` only if cookie needs to be set here
     res.status(result.status).json(result);
 };
