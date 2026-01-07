@@ -18,6 +18,8 @@ export const logout = async (req, res) => {
 };
 
 export const validate = async (req, res) => {
+    console.log(req.cookies.token);
+
     const result = await validateToken(req.cookies.token);
     res.status(result.status).json(result);
 };

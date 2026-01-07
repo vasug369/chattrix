@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react'
-import image from '../assets/download.png'
-import email_icon from '../assets/email_icon.png'
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios'
+import React, { useEffect, useState } from 'react';
+import image from '../assets/download.png';
+import email_icon from '../assets/email_icon.png';
+import { data, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+const BASE_URL = 'http://localhost:3000';
 
 function Login() {
-
     const [step, setStep] = useState('email');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -15,57 +16,55 @@ function Login() {
 
     const navigate = useNavigate();
 
-    useEffect(() => {
-        axios.get('http://localhost:3000/api/auth/validate', {
-            withCredentials: true
-        })
-            .then((res) => {
-                if (res.data.authenticated) {
-                    navigate('/dashboard');
-                }
-            })
-            .catch((err) => {
-                console.log(err);
-            })
 
-    }, [])
+    // useEffect(() => {
+    //     axios.get(`${BASE_URL}/api/auth/validate`, {
+    //         withCredentials: true
+    //     })
+    //         .then((res) => {
+    //             if (res.data.authenticated) {
+    //                 navigate('/dashboard');
+    //             }
+    //         })
+    //         .catch((err) => {
+    //             console.log(err);
+    //         });
+    // }, [handleLogin]);
 
     const handleRegister = async () => {
         try {
-
-            await axios.post('http://localhost:3000/api/auth/register', {
-                name: name,
-                email: email,
-                password: password
-            })
+            await axios.post(`${BASE_URL}/api/auth/register`, {
+                name,
+                email,
+                password
+            });
             setMode('signin');
-
             navigate('/');
-
-
-
-        }
-        catch (err) {
+        } catch (err) {
             console.log(err);
         }
-    }
+    };
 
     const handleLogin = async () => {
         try {
-            await axios.post('http://localhost:3000/api/auth/login', {
-                email: email,
-                password: password
+            const resposne=await axios.post(`${BASE_URL}/api/auth/login`, {
+                email,
+                password
             }, {
                 withCredentials: true
-            })
+            });
+            console.log('Login successful');
+            // console.log(resposne.data);
+            localStorage.setItem('token',resposne.data.data.token);
+            localStorage.setItem('name',resposne.data.data.name);
+            localStorage.setItem('email',resposne.data.data.email); 
+            localStorage.setItem('id',resposne.data.data.id);
 
             navigate('/dashboard');
-        }
-        catch (err) {
+        } catch (err) {
             console.log(err);
-
         }
-    }
+    };
 
     return (
         <>
@@ -75,9 +74,9 @@ function Login() {
                     <h2 className='title1 fixed mt-[775px] ml-[62px] text-[#ffffff] font-poppins text-5xl uppercase font-bold'>Sign in to your</h2>
                     <h2 className='title1 fixed mt-[820px] ml-[62px] text-[#501794] font-poppins text-5xl uppercase font-bold'>Adventure!</h2>
 
-                    <div className='w-1/2 h-full bg-[#160430]' >
+                    <div className='w-1/2 h-full bg-[#160430]'>
                         <div className="right-pane-wrapper flex flex-col">
-                            <div className='title2 uppercase text-[#ffffff] ml-[181px] mt-[197px] text-5xl' >Sign in</div>
+                            <div className='title2 uppercase text-[#ffffff] ml-[181px] mt-[197px] text-5xl'>Sign in</div>
                             {step === 'email' && (
                                 <>
                                     <input
@@ -95,7 +94,8 @@ function Login() {
                                         value={email}
                                     />
                                     <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }} onClick={() => setStep('password')}>Next</button>
+                                        style={{ marginLeft: "calc(901px - 80%)" }}
+                                        onClick={() => setStep('password')}>Next</button>
                                 </>
                             )}
 
@@ -110,9 +110,11 @@ function Login() {
                                         value={password}
                                     />
                                     <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }} onClick={() => setStep('email')}>Back</button>
+                                        style={{ marginLeft: "calc(901px - 80%)" }}
+                                        onClick={() => setStep('email')}>Back</button>
                                     <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }} onClick={handleLogin}>Sign in</button>
+                                        style={{ marginLeft: "calc(901px - 80%)" }}
+                                        onClick={handleLogin}>Sign in</button>
                                 </>
                             )}
                         </div>
@@ -127,14 +129,13 @@ function Login() {
 
             {mode === 'signup' && (
                 <div className='flex min-h-screen opacity-100'>
-                    <div className='w-1/2  bg-cover bg-center' style={{ backgroundImage: `url(${image})` }}></div>
+                    <div className='w-1/2 bg-cover bg-center' style={{ backgroundImage: `url(${image})` }}></div>
                     <h2 className='title1 fixed mt-[775px] ml-[62px] text-[#ffffff] font-poppins text-5xl uppercase font-bold'>Sign in to your</h2>
                     <h2 className='title1 fixed mt-[820px] ml-[62px] text-[#501794] font-poppins text-5xl uppercase font-bold'>Adventure!</h2>
 
                     <div className='w-1/2 h-full bg-[#160430]'>
                         <div className="right-pane-wrapper flex flex-col">
                             <div className='title2 uppercase text-[#ffffff] ml-[181px] mt-[197px] text-5xl'>Sign up</div>
-
 
                             <input
                                 type="text"
@@ -179,7 +180,8 @@ function Login() {
                             />
 
                             <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                style={{ marginLeft: "calc(901px - 80%)" }} onClick={handleRegister}>Sign up</button>
+                                style={{ marginLeft: "calc(901px - 80%)" }}
+                                onClick={handleRegister}>Sign up</button>
                         </div>
 
                         <hr className='mt-10px text-[#727272] w-[460px] mt-[60px]' style={{ marginLeft: "calc(901px - 80%)" }} />
@@ -190,7 +192,7 @@ function Login() {
                 </div>
             )}
         </>
-    )
+    );
 }
 
 export default Login;
