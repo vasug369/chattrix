@@ -6,6 +6,7 @@ import authRouter from './routes/authRoutes.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import postRouter from './routes/postRoutes.js';
+import { authMiddleware } from './middlewares/authMiddleware.js';
 
 connectDB();
 dotenv.config();
@@ -41,7 +42,7 @@ app.use(cors({
 }));
 
 app.use('/api/auth',authRouter);
-app.use('/api/post',postRouter);
+app.use('/api/post',authMiddleware,postRouter);
 
 // // Basic route
 // app.get('/', (req, res) => {

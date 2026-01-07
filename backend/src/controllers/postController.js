@@ -18,6 +18,7 @@ export const createPost = async (req, res) => {
 
 export const getPosts = async (req, res) => {
     try {
+        console.log('cookie', req.cookies);
         const posts = await getPostsService();
         res.status(200).json(posts);
     } catch (error) {
