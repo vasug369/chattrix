@@ -6,6 +6,7 @@ import authRouter from './routes/authRoutes.js';
 import postRouter from './routes/postRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import profileRouter from './routes/profileRoutes.js';
+import messageRouter from './routes/messageRoutes.js';
 
 import { authMiddleware } from './middlewares/authMiddleware.js';
 
@@ -28,6 +29,7 @@ const protectedRoutes = express.Router();
 protectedRoutes.use('/post', postRouter);
 protectedRoutes.use('/user', userRouter);
 protectedRoutes.use('/myProfile', profileRouter);
+protectedRoutes.use('/messages', messageRouter);
 
 app.use('/api', authMiddleware, protectedRoutes);
 

@@ -10,6 +10,10 @@ content: {
     type: String,
     required: true,
 },
+pic: {
+    type: String,
+    default: ""
+},
 author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
