@@ -1,10 +1,10 @@
 import express from 'express';
-// const { createPost, getPosts, getPostById, updatePost, deletePost } = require('../controllers/postController');
-import { createPost, getPosts, getPostById, updatePost, deletePost, getUserPosts ,likePost,commentPost, feedPosts, searchPosts} from '../controllers/postController.js';
+import { createPost, getPosts, getPostById, updatePost, deletePost, getUserPosts, likePost, commentPost, feedPosts, searchPosts } from '../controllers/postController.js';
+import upload from '../config/cloudinaryConfig.js';
 const postRouter = express.Router();
 
 // Route to create a new post
-postRouter.post('/create', createPost);
+postRouter.post('/create', upload.single('pic'), createPost);
 
 
 
