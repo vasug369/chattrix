@@ -69,7 +69,7 @@ function CreatePost() {
   return (
     <div className="min-h-screen w-full" style={{ background: 'var(--bg-primary)' }}>
       {/* ===== Top Navbar ===== */}
-      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between"
+      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between"
         style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
         
         <button
@@ -102,9 +102,9 @@ function CreatePost() {
         {/* ===== Left Sidebar ===== */}
         <aside
           className={`
-            fixed lg:sticky top-0 lg:top-[57px] left-0 z-50 lg:z-10
-            w-64 lg:w-56 h-full lg:h-[calc(100vh-57px)]
-            p-5 flex flex-col gap-2
+            fixed lg:sticky top-0 lg:top-[65px] left-0 z-50 lg:z-10
+            w-64 lg:w-56 h-full lg:h-[calc(100vh-65px)]
+            p-6 flex flex-col gap-2
             transition-transform duration-300 ease-in-out
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
@@ -149,8 +149,8 @@ function CreatePost() {
         </aside>
 
         {/* ===== Main Content ===== */}
-        <main className="flex-1 px-4 sm:px-6 py-6 max-w-2xl mx-auto w-full">
-          <div className="glass p-6 sm:p-8 animate-fade-in-up">
+        <main className="min-w-0 px-4 sm:px-6 py-8 max-w-2xl mx-auto w-full">
+          <div className="glass p-8 sm:p-10 animate-fade-in-up">
             <h2 className="text-2xl font-bold mb-2 font-poppins" style={{ color: 'var(--text-primary)' }}>
               Create New Post
             </h2>

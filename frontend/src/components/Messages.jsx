@@ -101,7 +101,7 @@ function Messages() {
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* ===== Top Navbar ===== */}
-      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between"
+      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between"
         style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
         
         <button
@@ -125,7 +125,7 @@ function Messages() {
       </header>
 
       {/* ===== Main Layout ===== */}
-      <div className="flex flex-1 relative overflow-hidden h-[calc(100vh-57px)]">
+      <div className="flex flex-1 relative overflow-hidden h-[calc(100vh-65px)]">
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -134,9 +134,9 @@ function Messages() {
         {/* ===== Left App Sidebar ===== */}
         <aside
           className={`
-            fixed lg:static top-[57px] left-0 z-50 lg:z-10
+            fixed lg:static top-[65px] left-0 z-50 lg:z-10
             w-64 lg:w-56 h-full
-            p-5 flex flex-col gap-2
+            p-6 flex flex-col gap-2
             transition-transform duration-300 ease-in-out shrink-0
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
@@ -186,7 +186,7 @@ function Messages() {
           {/* Chat Sidebar (User List) */}
           <div className={`w-full sm:w-80 h-full flex flex-col shrink-0 lg:border-r transition-all ${selectedUser ? 'hidden sm:flex' : 'flex'}`}
                style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}>
-            <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="p-5 border-b" style={{ borderColor: 'var(--border-color)' }}>
               <h2 className="text-lg font-bold font-poppins" style={{ color: 'var(--text-primary)' }}>Messages</h2>
             </div>
             
@@ -238,7 +238,7 @@ function Messages() {
             {selectedUser ? (
               <>
                 {/* Chat Header */}
-                <div className="h-16 px-4 sm:px-6 flex items-center gap-4 border-b shrink-0 glass" style={{ borderColor: 'var(--border-color)', borderRadius: 0 }}>
+                <div className="h-20 px-4 sm:px-6 flex items-center gap-4 border-b shrink-0 glass" style={{ borderColor: 'var(--border-color)', borderRadius: 0 }}>
                   <button 
                     className="sm:hidden text-lg cursor-pointer bg-transparent border-none"
                     style={{ color: 'var(--text-primary)' }}
@@ -246,7 +246,7 @@ function Messages() {
                   >
                     ←
                   </button>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
                        style={{ background: 'var(--accent-gradient)' }}>
                     {selectedUser.name.charAt(0).toUpperCase()}
                   </div>
@@ -254,7 +254,7 @@ function Messages() {
                 </div>
 
                 {/* Messages Container */}
-                <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                <div className="flex-1 p-6 sm:p-8 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                   {messages.map((msg, idx) => {
                     const fromMe = msg.senderId === currentUserId;
                     return (
@@ -279,8 +279,8 @@ function Messages() {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 sm:p-5 border-t shrink-0 glass" style={{ borderColor: 'var(--border-color)', borderRadius: 0 }}>
-                  <form onSubmit={handleSendMessage} className="flex gap-2 relative">
+                <div className="p-5 sm:p-6 border-t shrink-0 glass" style={{ borderColor: 'var(--border-color)', borderRadius: 0 }}>
+                  <form onSubmit={handleSendMessage} className="flex gap-3 relative">
                     <input
                       type="text"
                       placeholder="Type a message..."
