@@ -62,18 +62,18 @@ function Login() {
         style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)', animation: 'pulseGlow 8s ease-in-out infinite 2s' }} />
 
       {/* Main card */}
-      <div className="glass-strong w-full max-w-[460px] p-8 sm:p-10 animate-fade-in-up relative z-10">
+      <div className="glass-strong w-full max-w-[460px] p-10 sm:p-12 animate-fade-in-up relative z-10">
 
         {/* Logo & Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6"
             style={{ background: 'var(--accent-gradient)' }}>
-            <span className="text-3xl">💬</span>
+            <span className="text-4xl">💬</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-white font-poppins">
             Chattrix
           </h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
             {mode === 'signin' ? 'Welcome back! Sign in to continue' : 'Create your account to get started'}
           </p>
         </div>
@@ -87,11 +87,11 @@ function Login() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 stagger-children">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 stagger-children">
 
           {mode === 'signup' && (
             <div className="animate-fade-in-up">
-              <label className="block text-xs font-medium mb-1.5 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+              <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
                 Full Name
               </label>
               <input
@@ -121,7 +121,7 @@ function Login() {
           )}
 
           <div className="animate-fade-in-up">
-            <label className="block text-xs font-medium mb-1.5 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+            <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
               Email Address
             </label>
             <input
@@ -150,7 +150,7 @@ function Login() {
           </div>
 
           <div className="animate-fade-in-up">
-            <label className="block text-xs font-medium mb-1.5 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+            <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
               Password
             </label>
             <input
@@ -180,7 +180,7 @@ function Login() {
 
           {mode === 'signup' && (
             <div className="animate-fade-in-up">
-              <label className="block text-xs font-medium mb-1.5 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+              <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
                 Confirm Password
               </label>
               <input
@@ -214,7 +214,7 @@ function Login() {
             id="btn-submit"
             type="submit"
             disabled={loading}
-            className="w-full h-12 rounded-xl text-white font-semibold text-sm tracking-wide cursor-pointer transition-all duration-300 mt-2"
+            className="w-full h-12 rounded-xl text-white font-semibold text-sm tracking-wide cursor-pointer transition-all duration-300 mt-4"
             style={{
               background: 'var(--accent-gradient)',
               opacity: loading ? 0.7 : 1,
@@ -235,7 +235,7 @@ function Login() {
         </form>
 
         {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
+        <div className="flex items-center gap-4 my-8">
           <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
           <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />

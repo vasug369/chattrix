@@ -57,7 +57,7 @@ function Profile() {
   return (
     <div className="min-h-screen w-full" style={{ background: 'var(--bg-primary)' }}>
       {/* ===== Top Navbar ===== */}
-      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between"
+      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between"
         style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
         
         <button
@@ -90,9 +90,9 @@ function Profile() {
         {/* ===== Left Sidebar ===== */}
         <aside
           className={`
-            fixed lg:sticky top-0 lg:top-[57px] left-0 z-50 lg:z-10
-            w-64 lg:w-56 h-full lg:h-[calc(100vh-57px)]
-            p-5 flex flex-col gap-2
+            fixed lg:sticky top-0 lg:top-[65px] left-0 z-50 lg:z-10
+            w-64 lg:w-56 h-full lg:h-[calc(100vh-65px)]
+            p-6 flex flex-col gap-2
             transition-transform duration-300 ease-in-out
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
@@ -137,9 +137,9 @@ function Profile() {
         </aside>
 
         {/* ===== Main Content (Profile) ===== */}
-        <main className="flex-1 px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
+        <main className="min-w-0 px-4 sm:px-6 py-8 max-w-3xl mx-auto w-full">
           {user && (
-            <div className="glass p-8 sm:p-10 mb-8 flex flex-col items-center text-center animate-fade-in-up">
+            <div className="glass p-10 sm:p-12 mb-10 flex flex-col items-center text-center animate-fade-in-up">
               <div 
                 className="w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 flex items-center justify-center text-white text-4xl sm:text-5xl font-bold shadow-xl overflow-hidden"
                 style={{ background: 'var(--accent-gradient)' }}
@@ -183,7 +183,7 @@ function Profile() {
               {posts.map((post, idx) => (
                 <article
                   key={post._id}
-                  className="glass p-5 transition-all duration-300 animate-fade-in-up flex flex-col h-full"
+                  className="glass p-6 transition-all duration-300 animate-fade-in-up flex flex-col h-full"
                   style={{ animationDelay: `${idx * 60}ms` }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'var(--bg-card-hover)';

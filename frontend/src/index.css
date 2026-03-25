@@ -2,12 +2,12 @@
 
 :root {
   /* Colors */
-  --bg-primary: #0a0a1a;
-  --bg-secondary: #111128;
-  --bg-card: rgba(255, 255, 255, 0.04);
-  --bg-card-hover: rgba(255, 255, 255, 0.07);
-  --bg-input: rgba(255, 255, 255, 0.06);
-  --bg-input-focus: rgba(255, 255, 255, 0.1);
+  --bg-primary: #0a0a1b;
+  --bg-secondary: #13132e;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-card-hover: rgba(255, 255, 255, 0.08);
+  --bg-input: rgba(255, 255, 255, 0.07);
+  --bg-input-focus: rgba(255, 255, 255, 0.12);
 
   --accent-primary: #7c3aed;
   --accent-secondary: #3b82f6;
@@ -18,8 +18,8 @@
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
 
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(124, 58, 237, 0.5);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --border-glow: rgba(124, 58, 237, 0.6);
 
   --danger: #ef4444;
   --success: #22c55e;

@@ -152,7 +152,7 @@ function Dashboard() {
     <div className="min-h-screen w-full" style={{ background: 'var(--bg-primary)' }}>
 
       {/* ===== Top Navbar ===== */}
-      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between"
+      <header className="glass sticky top-0 z-50 px-4 sm:px-6 py-4 flex items-center justify-between"
         style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
 
         {/* Hamburger (mobile) */}
@@ -248,9 +248,9 @@ function Dashboard() {
         {/* ===== Left Sidebar ===== */}
         <aside
           className={`
-            fixed lg:sticky top-0 lg:top-[57px] left-0 z-50 lg:z-10
-            w-64 lg:w-56 h-full lg:h-[calc(100vh-57px)]
-            p-5 flex flex-col gap-2
+            fixed lg:sticky top-0 lg:top-[65px] left-0 z-50 lg:z-10
+            w-64 lg:w-56 h-full lg:h-[calc(100vh-65px)]
+            p-6 flex flex-col gap-2
             transition-transform duration-300 ease-in-out
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
@@ -291,9 +291,9 @@ function Dashboard() {
         </aside>
 
         {/* ===== Main Feed ===== */}
-        <main className="flex-1 px-4 sm:px-6 py-6 max-w-2xl mx-auto w-full">
+        <main className="min-w-0 px-4 sm:px-6 py-8 max-w-2xl mx-auto w-full">
 
-          <h2 className="text-xl font-semibold mb-5 font-poppins" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-xl font-semibold mb-6 font-poppins" style={{ color: 'var(--text-primary)' }}>
             Your Feed
           </h2>
 
@@ -302,7 +302,7 @@ function Dashboard() {
               {filteredData.map((item, index) => (
                 <article
                   key={item._id}
-                  className="glass p-5 sm:p-6 transition-all duration-300 animate-fade-in-up"
+                  className="glass p-6 sm:p-8 transition-all duration-300 animate-fade-in-up"
                   style={{ animationDelay: `${index * 60}ms` }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'var(--bg-card-hover)';
@@ -381,10 +381,10 @@ function Dashboard() {
                   </div>
 
                   {/* Post content */}
-                  <h3 className="text-base sm:text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                  <h3 className="text-base sm:text-lg font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
                     {item.title}
                   </h3>
-                  <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="text-sm leading-relaxed mb-5" style={{ color: 'var(--text-secondary)' }}>
                     {item.content}
                   </p>
 
@@ -523,7 +523,7 @@ function Dashboard() {
         </main>
 
         {/* ===== Right Sidebar ===== */}
-        <aside className="hidden xl:block w-64 sticky top-[57px] h-[calc(100vh-57px)] p-5"
+        <aside className="hidden xl:block w-64 shrink-0 sticky top-[65px] h-[calc(100vh-65px)] p-6"
           style={{ borderLeft: '1px solid var(--border-color)' }}>
 
           <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'var(--text-muted)' }}>
