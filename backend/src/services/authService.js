@@ -86,8 +86,8 @@ export const validateToken = async (token) => {
         return { status: 401, success: false, message: 'No token' };
 
     try {
-        jwt.verify(token, process.env.JWT_SECRET);
-        return { status: 200, authenticated: true };
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        return { status: 200, authenticated: true, userId: decoded.id };
     } catch {
         return { status: 403, success: false, message: 'Invalid token' };
     }
