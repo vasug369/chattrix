@@ -1,8 +1,8 @@
 @import "tailwindcss";
-/* Avoid overriding font styles in App.css */
+
 .font-credera {
-    font-family: 'Cedarville Cursive', cursive;
-  }
+  font-family: 'Cedarville Cursive', cursive;
+}
 .font-poppins {
-    font-family: 'Poppins', sans-serif;
-  }
+  font-family: 'Poppins', sans-serif;
+}
