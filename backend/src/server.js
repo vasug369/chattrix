@@ -1,65 +1,52 @@
-import express from 'express'
-import dotenv from 'dotenv'
-import connectDB from './config/dbConfig.js';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-
-import authRouter from './routes/authRoutes.js';
-import postRouter from './routes/postRoutes.js';
-import userRouter from './routes/userRoutes.js';    
-import profileRouter from './routes/profileRouter.js';
-
-import { authMiddleware } from './middlewares/authMiddleware.js';
-
-connectDB();
+import dotenv from 'dotenv';
 dotenv.config();
 
+import connectDB from './config/dbConfig.js';
+import app from './app.js';
 
-// const dummy=new User({
-//     name:"vasu",
-//     email:"dummy123@gmail.com",
-//     password:"1234"
-// })
+import http from 'http';
+import { Server } from 'socket.io';
 
-// dummy.save()
-// .then(()=>{
-//     console.log("data saved succesfully");
-// })
-// .catch((err)=>{
-//     console.log(err);
-// })
-const app = express();
+connectDB();
+
 const PORT = process.env.PORT || 3000;
 
+const server = http.createServer(app);
 
+//add https://chattrix-nmlf.vercel.app/ in cors
+export const io = new Server(server, {
+    cors: {
+        origin: ['http://localhost:5173','https://chattrix-nmlf.vercel.app'],
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
 
-// Middleware to parse JSON requests
-app.use(express.json());
-app.use(cookieParser());
+const userSocketMap = {}; // { userId: socketId }
 
-// const allowlist = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
+export const getReceiverSocketId = (receiverId) => {
+    return userSocketMap[receiverId];
+};
 
-app.use(cors({
-    origin: 'http://localhost:5173',
-    credentials: true
-}));
+io.on('connection', (socket) => {
+    console.log(`User Connected: ${socket.id}`);
 
+    const userId = socket.handshake.query.userId;
+    if (userId && userId !== 'undefined') {
+        userSocketMap[userId] = socket.id;
+    }
 
-//public route
-app.use('/api/auth', authRouter);
+    io.emit('getOnlineUsers', Object.keys(userSocketMap));
 
+    socket.on('disconnect', () => {
+        console.log('User Disconnected', socket.id);
+        if (userId) {
+            delete userSocketMap[userId];
+            io.emit('getOnlineUsers', Object.keys(userSocketMap));
+        }
+    });
+});
 
-//protected/private route
-const protectedRoutes = express.Router();
-protectedRoutes.use('/post', postRouter);
-protectedRoutes.use('/user', userRouter)
-protectedRoutes.use('/myProfile', profileRouter);
-
-
-app.use('/api', authMiddleware, protectedRoutes);
-
-// console.log('NODE_ENV:', process.env.NODE_ENV);
-
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

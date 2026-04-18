@@ -14,6 +14,11 @@ export const createPost = async (req, res) => {
     try {
         const userId = req.user._id; // Assuming user ID is stored in req.user
         req.body.author = userId; // Set the author field to the user's ID
+        
+        if (req.file) {
+            req.body.pic = req.file.path; // Cloudinary secure URL
+        }
+        
         const postData = req.body;
         const newPost = await createPostService(postData);
         res.status(201).json(newPost);

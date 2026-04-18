@@ -151,34 +151,10 @@ export const refreshAccessToken = async (req, res) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-
-        // You may also verify token existence in DB if storing refresh tokens there
-
-        const newAccessToken = jwt.sign(
-            { id: decoded.id },
-            process.env.JWT_SECRET,
-            { expiresIn: '15m' }
-        );
-
-        res.cookie('accessToken', newAccessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Lax',
-            maxAge: 15 * 60 * 1000
-        });
-
-        return res.status(200).json({
-            status: 200,
-            success: true,
-            message: 'Access token refreshed'
-        });
-    } catch (err) {
-        return res.status(403).json({
-            status: 403,
-            success: false,
-            message: 'Invalid refresh token'
-        });
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        return { status: 200, authenticated: true, userId: decoded.id };
+    } catch {
+        return { status: 403, success: false, message: 'Invalid token' };
     }
 };
 
