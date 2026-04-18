@@ -1,198 +1,274 @@
-import React, { useEffect, useState } from 'react';
-import image from '../assets/download.png';
-import email_icon from '../assets/email_icon.png';
-import { data, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'https://chattrix-2.onrender.com';
 
 function Login() {
-    const [step, setStep] = useState('email');
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [mode, setMode] = useState('signin');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [mode, setMode] = useState('signin');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
+  const handleRegister = async () => {
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(`${BASE_URL}/api/auth/register`, { name, email, password });
+      setMode('signin');
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // useEffect(() => {
-    //     axios.get(`${BASE_URL}/api/auth/validate`, {
-    //         withCredentials: true
-    //     })
-    //         .then((res) => {
-    //             if (res.data.authenticated) {
-    //                 navigate('/dashboard');
-    //             }
-    //         })
-    //         .catch((err) => {
-    //             console.log(err);
-    //         });
-    // }, [handleLogin]);
+  const handleLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(`${BASE_URL}/api/auth/login`, { email, password }, { withCredentials: true });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleRegister = async () => {
-        try {
-            await axios.post(`${BASE_URL}/api/auth/register`, {
-                name,
-                email,
-                password
-            });
-            setMode('signin');
-            navigate('/');
-        } catch (err) {
-            console.log(err);
-        }
-    };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    mode === 'signin' ? handleLogin() : handleRegister();
+  };
 
-    const handleLogin = async () => {
-        try {
-            const resposne=await axios.post(`${BASE_URL}/api/auth/login`, {
-                email,
-                password
-            }, {
-                withCredentials: true
-            });
-            console.log('Login successful');
-            // console.log(resposne.data);
-            localStorage.setItem('token',resposne.data.data.token);
-            localStorage.setItem('name',resposne.data.data.name);
-            localStorage.setItem('email',resposne.data.data.email); 
-            localStorage.setItem('id',resposne.data.data.id);
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden px-4 py-8"
+      style={{ background: 'linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 30%, #0f1b3d 60%, #0a0a1a 100%)' }}>
 
-            navigate('/dashboard');
-        } catch (err) {
-            console.log(err);
-        }
-    };
+      {/* Animated background orbs */}
+      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full opacity-20 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)', animation: 'pulseGlow 6s ease-in-out infinite' }} />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full opacity-15 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)', animation: 'pulseGlow 8s ease-in-out infinite 2s' }} />
 
-    return (
-        <>
-            {mode === 'signin' && (
-                <div className='flex h-screen opacity-100'>
-                    <div className='w-1/2 h-full bg-cover bg-center' style={{ backgroundImage: `url(${image})` }}></div>
-                    <h2 className='title1 fixed mt-[775px] ml-[62px] text-[#ffffff] font-poppins text-5xl uppercase font-bold'>Sign in to your</h2>
-                    <h2 className='title1 fixed mt-[820px] ml-[62px] text-[#501794] font-poppins text-5xl uppercase font-bold'>Adventure!</h2>
+      {/* Main card */}
+      <div className="glass-strong w-full max-w-[460px] p-10 sm:p-12 animate-fade-in-up relative z-10">
 
-                    <div className='w-1/2 h-full bg-[#160430]'>
-                        <div className="right-pane-wrapper flex flex-col">
-                            <div className='title2 uppercase text-[#ffffff] ml-[181px] mt-[197px] text-5xl'>Sign in</div>
-                            {step === 'email' && (
-                                <>
-                                    <input
-                                        type="text"
-                                        className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                        placeholder="Yourname@gmail.com"
-                                        style={{
-                                            marginLeft: "calc(901px - 80%)",
-                                            backgroundImage: `url(${email_icon})`,
-                                            backgroundPosition: "10px center",
-                                            backgroundRepeat: "no-repeat",
-                                            backgroundSize: "24px 24px",
-                                        }}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        value={email}
-                                    />
-                                    <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }}
-                                        onClick={() => setStep('password')}>Next</button>
-                                </>
-                            )}
+        {/* Logo & Brand */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6"
+            style={{ background: 'var(--accent-gradient)' }}>
+            <span className="text-4xl">💬</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white font-poppins">
+            Chattrix
+          </h1>
+          <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {mode === 'signin' ? 'Welcome back! Sign in to continue' : 'Create your account to get started'}
+          </p>
+        </div>
 
-                            {step === 'password' && (
-                                <>
-                                    <input
-                                        type="password"
-                                        className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                        placeholder="Enter your password"
-                                        style={{ marginLeft: "calc(901px - 80%)" }}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        value={password}
-                                    />
-                                    <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }}
-                                        onClick={() => setStep('email')}>Back</button>
-                                    <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                        style={{ marginLeft: "calc(901px - 80%)" }}
-                                        onClick={handleLogin}>Sign in</button>
-                                </>
-                            )}
-                        </div>
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 px-4 py-3 rounded-xl text-sm text-center animate-fade-in"
+            style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            {error}
+          </div>
+        )}
 
-                        <hr className='mt-10px text-[#727272] w-[460px] mt-[60px]' style={{ marginLeft: "calc(901px - 80%)" }} />
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 stagger-children">
 
-                        <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[150px] rounded-2xl cursor-pointer text-white text-2xl'
-                            onClick={() => { setMode('signup'); setStep('email'); }} style={{ marginLeft: "calc(901px - 80%)" }}>Sign Up</button>
-                    </div>
-                </div>
-            )}
+          {mode === 'signup' && (
+            <div className="animate-fade-in-up">
+              <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+                Full Name
+              </label>
+              <input
+                id="input-name"
+                type="text"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full h-12 rounded-xl px-4 text-sm text-white placeholder-gray-500 outline-none transition-all duration-300"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
+                }}
+                onFocus={(e) => {
+                  e.target.style.background = 'var(--bg-input-focus)';
+                  e.target.style.borderColor = 'var(--border-glow)';
+                  e.target.style.boxShadow = '0 0 20px var(--accent-glow)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.background = 'var(--bg-input)';
+                  e.target.style.borderColor = 'var(--border-color)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+          )}
 
-            {mode === 'signup' && (
-                <div className='flex min-h-screen opacity-100'>
-                    <div className='w-1/2 bg-cover bg-center' style={{ backgroundImage: `url(${image})` }}></div>
-                    <h2 className='title1 fixed mt-[775px] ml-[62px] text-[#ffffff] font-poppins text-5xl uppercase font-bold'>Sign in to your</h2>
-                    <h2 className='title1 fixed mt-[820px] ml-[62px] text-[#501794] font-poppins text-5xl uppercase font-bold'>Adventure!</h2>
+          <div className="animate-fade-in-up">
+            <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+              Email Address
+            </label>
+            <input
+              id="input-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full h-12 rounded-xl px-4 text-sm text-white placeholder-gray-500 outline-none transition-all duration-300"
+              style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-color)',
+              }}
+              onFocus={(e) => {
+                e.target.style.background = 'var(--bg-input-focus)';
+                e.target.style.borderColor = 'var(--border-glow)';
+                e.target.style.boxShadow = '0 0 20px var(--accent-glow)';
+              }}
+              onBlur={(e) => {
+                e.target.style.background = 'var(--bg-input)';
+                e.target.style.borderColor = 'var(--border-color)';
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+          </div>
 
-                    <div className='w-1/2 h-full bg-[#160430]'>
-                        <div className="right-pane-wrapper flex flex-col">
-                            <div className='title2 uppercase text-[#ffffff] ml-[181px] mt-[197px] text-5xl'>Sign up</div>
+          <div className="animate-fade-in-up">
+            <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+              Password
+            </label>
+            <input
+              id="input-password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full h-12 rounded-xl px-4 text-sm text-white placeholder-gray-500 outline-none transition-all duration-300"
+              style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-color)',
+              }}
+              onFocus={(e) => {
+                e.target.style.background = 'var(--bg-input-focus)';
+                e.target.style.borderColor = 'var(--border-glow)';
+                e.target.style.boxShadow = '0 0 20px var(--accent-glow)';
+              }}
+              onBlur={(e) => {
+                e.target.style.background = 'var(--bg-input)';
+                e.target.style.borderColor = 'var(--border-color)';
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+          </div>
 
-                            <input
-                                type="text"
-                                className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                placeholder="Enter your Name"
-                                style={{ marginLeft: "calc(901px - 80%)" }}
-                                onChange={(e) => setName(e.target.value)}
-                                value={name}
-                            />
+          {mode === 'signup' && (
+            <div className="animate-fade-in-up">
+              <label className="block text-xs font-medium mb-2 tracking-wide uppercase" style={{ color: 'var(--text-muted)' }}>
+                Confirm Password
+              </label>
+              <input
+                id="input-confirm-password"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="w-full h-12 rounded-xl px-4 text-sm text-white placeholder-gray-500 outline-none transition-all duration-300"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
+                }}
+                onFocus={(e) => {
+                  e.target.style.background = 'var(--bg-input-focus)';
+                  e.target.style.borderColor = 'var(--border-glow)';
+                  e.target.style.boxShadow = '0 0 20px var(--accent-glow)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.background = 'var(--bg-input)';
+                  e.target.style.borderColor = 'var(--border-color)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+          )}
 
-                            <input
-                                type="text"
-                                className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                placeholder="Enter your Email"
-                                style={{
-                                    marginLeft: "calc(901px - 80%)",
-                                    backgroundImage: `url(${email_icon})`,
-                                    backgroundPosition: "10px center",
-                                    backgroundRepeat: "no-repeat",
-                                    backgroundSize: "24px 24px",
-                                }}
-                                onChange={(e) => setEmail(e.target.value)}
-                                value={email}
-                            />
+          {/* Submit button */}
+          <button
+            id="btn-submit"
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 rounded-xl text-white font-semibold text-sm tracking-wide cursor-pointer transition-all duration-300 mt-4"
+            style={{
+              background: 'var(--accent-gradient)',
+              opacity: loading ? 0.7 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 8px 30px var(--accent-glow)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            {loading ? '...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
 
-                            <input
-                                type="password"
-                                className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                placeholder="Enter your password"
-                                style={{ marginLeft: "calc(901px - 80%)" }}
-                                onChange={(e) => setPassword(e.target.value)}
-                                value={password}
-                            />
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-8">
+          <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+          <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />
+        </div>
 
-                            <input
-                                type="password"
-                                className="w-[460px] h-[68.94px] bg-[#261046] mt-[30px] rounded-2xl pl-[60px] text-2xl text-white placeholder-white"
-                                placeholder="Confirm your password"
-                                style={{ marginLeft: "calc(901px - 80%)" }}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                value={confirmPassword}
-                            />
-
-                            <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[40px] rounded-2xl cursor-pointer text-white text-2xl'
-                                style={{ marginLeft: "calc(901px - 80%)" }}
-                                onClick={handleRegister}>Sign up</button>
-                        </div>
-
-                        <hr className='mt-10px text-[#727272] w-[460px] mt-[60px]' style={{ marginLeft: "calc(901px - 80%)" }} />
-
-                        <button className='w-[460px] h-[62.67px] bg-gradient-to-r from-[#501794] to-[#3E70A1] mt-[150px] rounded-2xl cursor-pointer text-white text-2xl'
-                            style={{ marginLeft: "calc(901px - 80%)" }} onClick={() => setMode('signin')}>Back to Sign In</button>
-                    </div>
-                </div>
-            )}
-        </>
-    );
+        {/* Mode toggle */}
+        <button
+          id="btn-toggle-mode"
+          type="button"
+          onClick={() => {
+            setMode(mode === 'signin' ? 'signup' : 'signin');
+            setError('');
+          }}
+          className="w-full h-12 rounded-xl text-sm font-medium cursor-pointer transition-all duration-300"
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-secondary)',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.borderColor = 'var(--border-glow)';
+            e.target.style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.borderColor = 'var(--border-color)';
+            e.target.style.color = 'var(--text-secondary)';
+          }}
+        >
+          {mode === 'signin' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default Login;

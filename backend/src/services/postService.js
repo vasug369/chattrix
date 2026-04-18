@@ -74,15 +74,12 @@ const getUserPosts = async (userId) => {
 }
 
 const commentPost = async (req, postId) => {
-    // console.log('postId:', postId); // Debugging line
-    // console.log('req.user:', req.user); // Debugging line
     try {
         const post = await Post.findById(postId);
         const comment_username= await User.findById(req.user._id, 'name');
         if (!comment_username) {
             throw new Error('User not found');
         }
-        console.log('post:', post); // Debugging line
         if (!post) {
             throw new Error('Post not found');
         }
@@ -91,15 +88,12 @@ const commentPost = async (req, postId) => {
             content: req.body.content,
             name: comment_username.name
         })
-        post.save();
-        return post;
-
+        await post.save();
+        return await Post.findById(postId).populate('author', 'name');
     }
     catch (err) {
         throw new Error('error commenting on post: ' + err.message);
-
     }
-
 }
 
 
