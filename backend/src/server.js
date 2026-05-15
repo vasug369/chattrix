@@ -7,7 +7,7 @@ import app from './app.js';
 import http from 'http';
 import { Server } from 'socket.io';
 
-connectDB();
+connectDB(); //connection made to the db
 
 const PORT = process.env.PORT || 3000;
 
