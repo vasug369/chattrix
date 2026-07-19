@@ -1,112 +1,104 @@
 import User from "../models/user.model.js";
+import Post from "../models/post.model.js";
+import Notification from "../models/notification.model.js";
+import { createNotification } from "./notificationService.js";
+
+// Never send these to the client, even for the user's own list/search results.
+export const PUBLIC_USER_EXCLUDE = '-password -verifyOtp -verifyOtpExpireAt -resetOtp -resetOtpExpireAt';
 
 export const getUserService = async (userId) => {
-    try {
-
-        // console.log("Fetching user with ID:", userId);
-
-        const user = await User.findById(userId);
-        if (!user) {
-            throw new Error("User not found");
-        }
-        return user;
+    const user = await User.findById(userId).select(PUBLIC_USER_EXCLUDE);
+    if (!user) {
+        throw new Error("User not found");
     }
-    catch (error) {
-        throw new Error("Error fetching user: " + error.message);
-    }
-}
+    return user;
+};
 
+const ALLOWED_UPDATE_FIELDS = ['name', 'bio', 'pic'];
 
 export const updateUserService = async (userId, data) => {
-    try {
-        // Find the user by ID and update with the provided data
-        const updatedUser = await User.findByIdAndUpdate(userId, data, { new: true, runValidators: true });
-        if (!updatedUser) {
-            throw new Error('User not found');
-        }
-        // Return the updated user object
-        return updatedUser;
-    } catch (error) {
-        // Handle errors, such as user not found or validation errors
-        throw new Error('Error updating user: ' + error.message);
+    const updateData = {};
+    for (const field of ALLOWED_UPDATE_FIELDS) {
+        if (data[field] !== undefined) updateData[field] = data[field];
     }
-}
 
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true, runValidators: true }).select(PUBLIC_USER_EXCLUDE);
+    if (!updatedUser) {
+        throw new Error('User not found');
+    }
+    return updatedUser;
+};
 
 export const followUserService = async (userId, followUserId) => {
-    try {
-        // console.log("User ID:", userId);
-        // console.log("Follow User ID:", followUserId);   
-        const user = await User.findById(userId);
-        const followUser = await User.findById(followUserId);
-        if (!user || !followUser) {
-            throw new Error('User or follow user not found');
-        }
-        // console.log(user._id, followUser._id);
-
-        if (!followUser.followers.some(id => id.toString() === user._id.toString())) {
-            followUser.followers.push(user._id);
-        }
-
-        if (!user.following.some(id => id.toString() === followUser._id.toString())) {
-            console.log('Pushing followUser._id to user.following:', followUser._id.toString());
-
-            user.following.push(followUser._id);
-        }
-        await followUser.save();
-        await user.save();
-        return { user, followUser };
+    if (userId.toString() === followUserId.toString()) {
+        throw new Error("You can't follow yourself");
     }
-    catch (error) {
-        throw new Error('Error following user: ' + error.message);
-    }
-}
 
+    const user = await User.findById(userId);
+    const followUser = await User.findById(followUserId);
+    if (!user || !followUser) {
+        throw new Error('User or follow user not found');
+    }
+
+    if (!followUser.followers.some(id => id.toString() === user._id.toString())) {
+        followUser.followers.push(user._id);
+    }
+
+    if (!user.following.some(id => id.toString() === followUser._id.toString())) {
+        user.following.push(followUser._id);
+    }
+
+    await followUser.save();
+    await user.save();
+
+    await createNotification({ recipient: followUser._id, sender: user._id, type: 'follow' });
+
+    return { user, followUser };
+};
 
 export const unfollowUserService = async (userId, unfollowUserId) => {
-    try{
-        const user=await User.findById(userId);
-        const unfollowUser=await User.findById(unfollowUserId);
-        if(!user || !unfollowUser){
-            throw new Error('User or unfollow user not found');
-        }
-        // Remove the unfollowUser from user's following list
-        user.following = user.following.filter(id => id.toString() !== unfollowUser._id.toString());
-        // Remove the user from unfollowUser's followers list
-        unfollowUser.followers = unfollowUser.followers.filter(id => id.toString() !== user._id.toString());
-        await user.save();
-        await unfollowUser.save();
-        return { user, unfollowUser };
+    const user = await User.findById(userId);
+    const unfollowUser = await User.findById(unfollowUserId);
+    if (!user || !unfollowUser) {
+        throw new Error('User or unfollow user not found');
     }
-    catch (error) {
-        throw new Error('Error unfollowing user: ' + error.message);
-    }
-}
 
+    user.following = user.following.filter(id => id.toString() !== unfollowUser._id.toString());
+    unfollowUser.followers = unfollowUser.followers.filter(id => id.toString() !== user._id.toString());
+
+    await user.save();
+    await unfollowUser.save();
+    return { user, unfollowUser };
+};
 
 export const deleteUserService = async (userId) => {
-    try{
-        const deletedUser = await User.findByIdAndDelete(userId);
-        if (!deletedUser) {
-            throw new Error('User not found');
-        }
-        return deletedUser;
+    const deletedUser = await User.findByIdAndDelete(userId);
+    if (!deletedUser) {
+        throw new Error('User not found');
     }
-    catch (error) {
-        throw new Error('Error deleting user: ' + error.message);
-    }
-}
+
+    // Keep data consistent: clean up everything that referenced this user.
+    await Post.deleteMany({ author: userId });
+    await User.updateMany(
+        { $or: [{ followers: userId }, { following: userId }] },
+        { $pull: { followers: userId, following: userId } }
+    );
+    await Notification.deleteMany({ $or: [{ recipient: userId }, { sender: userId }] });
+
+    return deletedUser;
+};
 
 export const getAllUsersService = async () => {
-    try {
-        const users = await User.find({});
-        if (!users || users.length === 0) {
-            throw new Error('No users found');
-        }
-        return users;
-    } catch (error) {
-        throw new Error('Error fetching all users: ' + error.message);
-    }
-}
+    return User.find({}).select(PUBLIC_USER_EXCLUDE);
+};
 
-
+export const searchUsersService = async (query, excludeUserId) => {
+    if (!query) return [];
+    return User.find({
+        _id: { $ne: excludeUserId },
+        $or: [
+            { name: { $regex: query, $options: 'i' } },
+            { email: { $regex: query, $options: 'i' } },
+        ],
+    }).select(PUBLIC_USER_EXCLUDE).limit(20);
+};

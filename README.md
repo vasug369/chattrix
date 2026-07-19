@@ -9,8 +9,8 @@ A social media platform with microblogging + real-time messaging, built with Rea
 | Layer       | Technology |
 |------------|------------|
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
-| Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
-| Database   | MongoDB Atlas |
+| Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary v2, Nodemailer, Helmet, express-rate-limit, express-validator |
+| Database   | MongoDB (Atlas in production, local `mongod` for development) |
 | Deployment | Frontend: Vercel · Backend: Render |
 
 ---
@@ -22,56 +22,63 @@ chattrix/
 ├── backend/               # Express API + Socket.io server
 │   ├── src/
 │   │   ├── server.js      # Entry point, HTTP + Socket.io
-│   │   ├── app.js         # Express app, routes
-│   │   ├── config/        # DB, Cloudinary, Nodemailer
-│   │   ├── models/        # Mongoose schemas
+│   │   ├── app.js         # Express app, middleware, route mounting
+│   │   ├── config/        # DB, Cloudinary, Nodemailer, CORS
+│   │   ├── models/        # Mongoose schemas (User, Post, Conversation, Message, Notification)
 │   │   ├── controllers/   # Request handlers
-│   │   ├── services/      # Business logic
-│   │   ├── middlewares/    # Auth middleware
-│   │   └── routes/        # Route definitions
+│   │   ├── services/      # Business logic (never touches `res` — returns plain result objects)
+│   │   ├── middlewares/   # Auth, validation, rate limiting, error handling
+│   │   ├── routes/        # Route definitions
+│   │   └── utils/         # OTP generation, cookie option helpers
 │   ├── .env
 │   └── package.json
 ├── frontend/              # React SPA
 │   ├── src/
-│   │   ├── main.jsx       # React root
-│   │   ├── App.jsx        # Router
+│   │   ├── main.jsx
+│   │   ├── App.jsx        # Router + route definitions
+│   │   ├── api/axios.js   # Centralized API client (VITE_API_BASE_URL)
+│   │   ├── context/       # AuthContext, ToastContext
 │   │   ├── index.css      # Design system
-│   │   └── components/    # All page components
-│   ├── .env / .env.local
+│   │   └── components/
+│   │       ├── layout/AppLayout.jsx  # Shared header/sidebar for all authenticated pages
+│   │       └── ...                   # Page components
+│   ├── .env / .env.production
 │   └── package.json
-├── docs/                  # Static build (old deployment)
 ├── backend-context.md     # Backend architecture docs
 ├── frontend-context.md    # Frontend architecture docs
-└── PRD.md                 # Product requirements
+├── PRD.md                 # Product requirements — what's built, what's next
+└── BRD.md                 # Business model, revenue tiers, monetization roadmap
 ```
 
 ---
 
-## Quick Start
+## Quick Start (local development)
 
 ### Prerequisites
 - Node.js 18+
-- MongoDB Atlas cluster (or local MongoDB)
-- Cloudinary account (for image uploads)
+- A local MongoDB instance (`mongod` running on `27017`) — recommended for dev so you never touch production data
+- A Cloudinary account (free tier is fine) for image uploads
+- An SMTP provider (e.g. Brevo free tier) for verification/reset emails — optional for dev; OTPs are stored in the DB regardless of whether the email sends
 
 ### Backend Setup
 
 ```bash
 cd backend
 cp .env.sample .env
-# Edit .env with your actual credentials (see Environment Variables below)
+# Edit .env — at minimum set MONGO_URI, JWT_SECRET, JWT_REFRESH_SECRET
 npm install
-npm run dev        # Starts with nodemon on port 3000
+npm run dev        # nodemon, http://localhost:3000
 ```
 
 ### Frontend Setup
 
 ```bash
 cd frontend
-# Edit .env to point to your backend
 npm install
-npm run dev        # Starts Vite dev server on port 5173
+npm run dev        # Vite dev server, http://localhost:5173
 ```
+
+`frontend/.env` points local dev at `http://localhost:3000`. `frontend/.env.production` points production builds at the deployed Render backend — Vite picks the right one automatically based on `npm run dev` vs `npm run build`.
 
 ---
 
@@ -81,36 +88,34 @@ npm run dev        # Starts Vite dev server on port 5173
 
 ```env
 PORT=3000
-
-# MongoDB Atlas
-DB_Host=<atlas_username>
-DB_Pass=<atlas_password>
-DB_Name=chattrix
-
-# JWT
-JWT_SECRET=<your_jwt_secret>
-JWT_REFRESH_SECRET=<your_refresh_secret>    # ⚠️ REQUIRED but missing from current .env
 NODE_ENV=development
 
-# Email (Nodemailer)
+MONGO_URI=mongodb://127.0.0.1:27017/chattrix_dev
+
+JWT_SECRET=<random-string>
+JWT_REFRESH_SECRET=<random-string>
+
+SMTP_HOST=smtp-relay.brevo.com
 SMTP_USER=<smtp_user>
 SMTP_PASS=<smtp_password>
 SMTP_PORT=587
 SENDER_EMAIL=<your_email>
 
-# Cloudinary (currently hardcoded as fallback — should be in .env)
 CLOUDINARY_CLOUD_NAME=<cloud_name>
 CLOUDINARY_API_KEY=<api_key>
 CLOUDINARY_API_SECRET=<api_secret>
+
+CORS_ORIGINS=http://localhost:5173,https://your-frontend.vercel.app
 ```
 
-### Frontend (`frontend/.env`)
+In production, set `MONGO_URI` to your Atlas connection string and `NODE_ENV=production` (this also switches cookies to `sameSite: 'None'; secure: true`, required for the cross-site Vercel↔Render setup).
 
-```env
-VITE_API_BASE_URL=http://localhost:3000
-```
+### Frontend
 
-> ⚠️ **Known issue**: `VITE_API_BASE_URL` is defined but not used by any component. All components hardcode their base URL.
+| File | Purpose |
+|------|---------|
+| `frontend/.env` | Used by `npm run dev` — points at local backend |
+| `frontend/.env.production` | Used by `npm run build` — points at the deployed backend |
 
 ---
 
@@ -132,15 +137,14 @@ VITE_API_BASE_URL=http://localhost:3000
 
 ---
 
-## Known Issues
+## Testing locally
 
-See `backend-context.md` and `frontend-context.md` for detailed issue lists. Critical items:
-
-1. **Auth controller double-response bug** — services send responses directly, then controllers try to send again
-2. **`JWT_REFRESH_SECRET` missing from `.env`** — refresh token operations fail
-3. **All frontend routes unprotected** — `ProtectedRoute` is commented out
-4. **Hardcoded base URLs in every component** — `VITE_API_BASE_URL` env var is unused
-5. **Credentials in source code** — Cloudinary keys and Mailtrap credentials hardcoded
+1. Start `mongod` locally and point `MONGO_URI` at it — this keeps test data completely separate from production.
+2. Start backend (`npm run dev`) and frontend (`npm run dev`).
+3. Register a user through the UI. Since email delivery is optional in dev, verification/reset OTPs can be read directly from Mongo:
+   ```bash
+   mongosh chattrix_dev --eval "db.users.findOne({email:'you@example.com'}, {verifyOtp:1, resetOtp:1})"
+   ```
 
 ---
 

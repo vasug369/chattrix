@@ -1,20 +1,25 @@
 import User from "../models/user.model.js";
-const getProfileById = async (profileId) => {
-    try {
-        const user = await User.findById(profileId);
+import Post from "../models/post.model.js";
 
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-        return user;
-
+export const getProfileService = async (profileId, viewerId) => {
+    const user = await User.findById(profileId).select('-password');
+    if (!user) {
+        throw new Error("User not found");
     }
-    catch (err) {
-        throw err;
 
-    }
-}
+    const postsCount = await Post.countDocuments({ author: profileId });
 
-
-export const getProfileService = getProfileById;
+    return {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        pic: user.pic,
+        bio: user.bio,
+        createdAt: user.createdAt,
+        followersCount: user.followers.length,
+        followingCount: user.following.length,
+        postsCount,
+        isFollowing: viewerId ? user.followers.some(id => id.toString() === viewerId.toString()) : false,
+        isSelf: viewerId ? user._id.toString() === viewerId.toString() : false,
+    };
+};
