@@ -1,23 +1,39 @@
 import express from "express";
-import {deleteUser, followUser, getUser,unfollowUser,updateUser,getAllUsers} from '../controllers/userController.js';
+import {
+    deleteUser,
+    followUser,
+    getUser,
+    unfollowUser,
+    updateUser,
+    getAllUsers,
+    searchUsers,
+} from '../controllers/userController.js';
+import upload from '../config/cloudinaryConfig.js';
+
 const userRouter = express.Router();
 
-userRouter.get('/getAllUsers',getAllUsers);
-userRouter.get('/me',(req, res) => {
+userRouter.get('/getAllUsers', getAllUsers);
+
+userRouter.get('/me', (req, res) => {
     res.status(200).json({
         id: req.user._id,
         email: req.user.email,
         name: req.user.name,
-        // ...anything else you want
+        pic: req.user.pic,
+        bio: req.user.bio,
+        isAccountVerified: req.user.isAccountVerified,
+        following: req.user.following,
+        followers: req.user.followers,
     });
 });
-userRouter.get('/:id',getUser);
 
-userRouter.put('/:followUserId/follow',followUser); // Assuming you want to follow a user, you can implement the logic in the controller
-userRouter.put('/:unfollowUserId/unfollow',unfollowUser); // Assuming you want to follow a user, you can implement the logic in the controller
-userRouter.put('/:id',updateUser); // Assuming you want to update user details, you can implement the logic in the controller
-userRouter.delete('/', deleteUser); // Assuming you want to delete a user, you can implement the logic in the controller
-    
+userRouter.get('/search', searchUsers);
 
+userRouter.put('/:followUserId/follow', followUser);
+userRouter.put('/:unfollowUserId/unfollow', unfollowUser);
+userRouter.delete('/', deleteUser);
+
+userRouter.get('/:id', getUser);
+userRouter.put('/:id', upload.single('pic'), updateUser);
 
 export default userRouter;

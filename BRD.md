@@ -166,12 +166,13 @@
 
 ### Phase 1 — Foundation (Before any revenue features)
 > **Must fix the existing bugs first.** No one pays for a broken product.
+> **Status (2026-07-19): Complete.** See PRD.md for the full list of fixes verified in this pass — this went well beyond the five items below (feed correctness bug, OTP/password leaks, cross-site cookie bug, dependency vulnerabilities, email verification, password reset, and more).
 
-- [ ] Fix auth controller/service double-response bug
-- [ ] Add `JWT_REFRESH_SECRET` to `.env`
-- [ ] Create centralized API service on frontend
-- [ ] Re-enable `ProtectedRoute`
-- [ ] Remove hardcoded credentials from source
+- [x] Fix auth controller/service double-response bug
+- [x] Add `JWT_REFRESH_SECRET` to `.env`
+- [x] Create centralized API service on frontend
+- [x] Re-enable `ProtectedRoute`
+- [x] Remove hardcoded credentials from source
 
 ### Phase 2 — Pro Tier (Month 1–2)
 Backend + frontend work needed:

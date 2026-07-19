@@ -1,20 +1,19 @@
 import mongoose from "mongoose";
-import dotenv from 'dotenv';
-dotenv.config();
-const mongoUri=mongoose.connect(`mongodb+srv://${process.env.DB_Host}:${process.env.DB_Pass}@cluster0.ffirymn.mongodb.net/${process.env.DB_Name}?retryWrites=true&w=majority&appName=Cluster0`);
 
-const connectDB=async()=>{
-    await mongoUri
-.then(()=>{
-    console.log("mongodb is connected");
-    // console.log("mongo uri is",mongoUri);
-    
+const connectDB = async () => {
+    const uri = process.env.MONGO_URI;
 
-})
-.catch((err)=>{
-    console.log(err);
-})
+    if (!uri) {
+        throw new Error("MONGO_URI is not set in the environment");
+    }
 
-}
+    try {
+        await mongoose.connect(uri);
+        console.log("MongoDB connected");
+    } catch (err) {
+        console.error("MongoDB connection error:", err.message);
+        process.exit(1);
+    }
+};
 
 export default connectDB;

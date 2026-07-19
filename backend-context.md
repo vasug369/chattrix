@@ -1,22 +1,23 @@
 # Backend Context — Chattrix
 
-> Auto-generated from codebase analysis on 2026-04-25. This is the single source of truth for backend architecture decisions.
+> Updated 2026-07-19 after the production-hardening pass. Single source of truth for backend architecture decisions.
 
 ---
 
 ## Stack
 
-| Layer        | Technology               | Version   |
-|-------------|--------------------------|-----------|
-| Runtime     | Node.js                  | —         |
-| Framework   | Express                  | 5.1.0     |
-| Database    | MongoDB (Atlas)          | Mongoose 8.14.2 |
-| Auth        | JWT (access + refresh)   | jsonwebtoken 9.0.2 |
-| Password    | bcryptjs                 | 3.0.2     |
-| Realtime    | Socket.io                | 4.8.3     |
-| File Upload | Multer + Cloudinary      | multer 2.1.1, cloudinary 1.41.3 |
-| Email       | Nodemailer (Mailtrap sandbox) | node-mailer 0.1.1 ⚠️ |
-| Module System | ES Modules (`"type": "module"`) | — |
+| Layer        | Technology               |
+|-------------|---------------------------|
+| Runtime     | Node.js                   |
+| Framework   | Express 5                 |
+| Database    | MongoDB (Mongoose 8)      |
+| Auth        | JWT (access + refresh)    |
+| Password    | bcryptjs                  |
+| Realtime    | Socket.io                 |
+| File Upload | Multer (memory storage) + Cloudinary v2 (`upload_stream`) |
+| Email       | Nodemailer (Brevo SMTP)   |
+| Security    | Helmet, express-rate-limit, express-validator |
+| Module System | ES Modules (`"type": "module"`) |
 
 ---
 
@@ -24,40 +25,52 @@
 
 ```
 backend/
-├── .env                    # Environment variables (NEVER commit)
-├── .env.sample             # Template for .env
+├── .env                     # Environment variables (NEVER commit)
+├── .env.sample              # Template — placeholders only
 ├── package.json
 └── src/
-    ├── server.js            # HTTP server, Socket.io setup, entry point
-    ├── app.js               # Express app, middleware, route mounting
+    ├── server.js             # HTTP server, Socket.io setup, entry point
+    ├── app.js                # Express app, middleware, route mounting
     ├── config/
-    │   ├── dbConfig.js      # MongoDB Atlas connection
-    │   ├── cloudinaryConfig.js  # Cloudinary + Multer storage
-    │   └── nodemailer.js    # SMTP transporter
+    │   ├── dbConfig.js       # MongoDB connection (MONGO_URI)
+    │   ├── cloudinaryConfig.js  # Cloudinary v2 config + multer memory storage + upload_stream helper
+    │   ├── corsConfig.js     # Shared CORS origin list (CORS_ORIGINS)
+    │   └── nodemailer.js     # SMTP transporter
     ├── models/
     │   ├── user.model.js
     │   ├── post.model.js
     │   ├── conversation.model.js
-    │   └── message.model.js
+    │   ├── message.model.js
+    │   └── notification.model.js
     ├── controllers/
     │   ├── authController.js
     │   ├── userController.js
     │   ├── postController.js
     │   ├── profileController.js
-    │   └── messageController.js
+    │   ├── messageController.js
+    │   └── notificationController.js
     ├── services/
-    │   ├── authService.js
+    │   ├── authService.js     # Returns plain result objects — never touches `res`
     │   ├── userService.js
     │   ├── postService.js
-    │   └── profileService.js   # ⚠️ No messageService.js
+    │   ├── profileService.js
+    │   ├── messageService.js
+    │   └── notificationService.js
     ├── middlewares/
-    │   └── authMiddleware.js
+    │   ├── authMiddleware.js
+    │   ├── validate.js        # express-validator error formatter
+    │   ├── rateLimiter.js
+    │   └── errorHandler.js    # Centralized fallback error handler + 404
+    ├── utils/
+    │   ├── otp.js
+    │   └── cookieOptions.js
     └── routes/
         ├── authRoutes.js
         ├── userRoutes.js
         ├── postRoutes.js
         ├── profileRoutes.js
-        └── messageRoutes.js
+        ├── messageRoutes.js
+        └── notificationRoutes.js
 ```
 
 ---
@@ -65,196 +78,128 @@ backend/
 ## Auth Flow
 
 ### Token Strategy
-- **Access token**: JWT, 15min expiry, stored in `token` httpOnly cookie
-- **Refresh token**: JWT, 7 days expiry, stored in `refreshToken` httpOnly cookie
-- Cookies: `httpOnly: true`, `secure` in production, `sameSite: 'Lax'`
+- **Access token**: JWT, 15min expiry, `token` httpOnly cookie
+- **Refresh token**: JWT, 7 days expiry, `refreshToken` httpOnly cookie
+- Cookie options (`utils/cookieOptions.js`): `httpOnly: true` always; `secure` + `sameSite: 'None'` in production (required for the cross-site Vercel↔Render deployment); `secure: false` + `sameSite: 'Lax'` in local dev
 
-### Access token payload
-```json
-{ "id": "<user._id>", "name": "<user.name>", "email": "<user.email>" }
-```
-
-### Refresh token payload
-```json
-{ "id": "<user._id>" }
-```
+### Service/Controller Split
+Services return `{ status, success, message, data?, cookies?, clearCookies? }` — they never call `res` directly. `authController.js`'s `applyResult` helper applies cookies/clears them, then strips `cookies`/`clearCookies` from the body before sending JSON (tokens must never appear in the response body, only in httpOnly cookies).
 
 ### Auth Middleware (`authMiddleware.js`)
 - Reads `token` from `req.cookies.token`
-- If valid → attaches `req.user` (full User doc minus password) → calls `next()`
-- If expired AND `refreshToken` exists → verifies refresh token → issues new access token cookie → attaches `req.user` → calls `next()`
-- If both fail → returns 401
+- Valid → attaches `req.user` (password/OTP fields excluded) → `next()`
+- Expired + valid `refreshToken` present → issues new access token cookie → `next()`
+- Any other failure → `401` (every code path returns a response — the old version could silently hang with no response on some failure branches)
 
 ### Route Protection
-- Public: `/api/auth/*` — no auth required
-- Protected: `/api/post/*`, `/api/user/*`, `/api/myProfile/*`, `/api/messages/*` — all behind `authMiddleware`
+- Public: `/api/auth/register`, `/login`, `/logout`, `/validate`, `/send-reset-otp`, `/reset-password`
+- Protected (behind `authMiddleware`): `/api/auth/send-verify-otp`, `/verify-email`, and everything under `/api/post`, `/api/user`, `/api/myProfile`, `/api/messages`, `/api/notifications`
 
 ---
 
 ## Database Schema
 
 ### User (`user.model.js`)
-| Field              | Type       | Required | Default |
-|--------------------|-----------|----------|---------|
-| name               | String    | ✅       | —       |
-| email              | String    | ✅ unique| —       |
-| password           | String    | ✅       | —       |
-| pic                | String    | ❌       | default avatar URL |
-| followers          | [ObjectId → User] | ❌ | [] |
-| following          | [ObjectId → User] | ❌ | [] |
-| verifyOtp          | String    | ❌       | ""      |
-| verifyOtpExpiry    | Date      | ❌       | 0       |
-| isAccountVerified  | Boolean   | ❌       | false   |
-| resetOtp           | String    | ❌       | ""      |
-| resetOtpExpiry     | Date      | ❌       | 0       |
-| createdAt          | Date      | ❌       | Date.now|
+| Field              | Type       | Notes |
+|--------------------|-----------|-------|
+| name, email, password | String   | email lowercased/trimmed, unique |
+| pic                | String    | default `""` — frontend falls back to a letter avatar |
+| bio                | String    | max 160 chars |
+| followers / following | [ObjectId → User] | |
+| verifyOtp / verifyOtpExpireAt | String / Date | |
+| isAccountVerified  | Boolean   | |
+| resetOtp / resetOtpExpireAt | String / Date | |
+
+**Never select** `password`, `verifyOtp`, `verifyOtpExpireAt`, `resetOtp`, `resetOtpExpireAt` into any client-facing response — `userService.PUBLIC_USER_EXCLUDE` is the shared exclusion string, used across `getUserService`, `getAllUsersService`, `searchUsersService`, and `messageService.getUsersForSidebarService`.
 
 ### Post (`post.model.js`)
-| Field     | Type       | Required | Default |
-|-----------|-----------|----------|---------|
-| title     | String    | ✅       | —       |
-| content   | String    | ✅       | —       |
-| pic       | String    | ❌       | ""      |
-| author    | ObjectId → User | ✅ | —       |
-| createdAt | Date      | ❌       | Date.now|
-| updatedAt | Date      | ❌       | —       |
-| likes     | [ObjectId → User] | ❌ | [] |
-| comments  | [{ author: ObjectId, content: String, createdAt: Date, name: String }] | ❌ | [] |
+Same shape as before (title, content, pic, author, likes[], comments[]), with `comments.createdAt` correctly defaulting to `Date.now` (function reference, not an invoked timestamp shared across all comments). Indexed on `{ author: 1, createdAt: -1 }`.
 
-### Conversation (`conversation.model.js`)
-| Field        | Type       | Notes |
-|-------------|-----------|-------|
-| participants | [ObjectId → User] | — |
-| messages     | [ObjectId → Message] | — |
-| timestamps   | auto (createdAt, updatedAt) | Mongoose `timestamps: true` |
+### Notification (`notification.model.js`) — new
+| Field | Type |
+|-------|------|
+| recipient / sender | ObjectId → User |
+| type | enum: `follow`, `like`, `comment`, `message` |
+| post | ObjectId → Post (optional) |
+| read | Boolean |
 
-### Message (`message.model.js`)
-| Field      | Type       | Required |
-|-----------|-----------|----------|
-| senderId   | ObjectId → User | ✅ |
-| receiverId | ObjectId → User | ✅ |
-| message    | String    | ✅       |
-| timestamps | auto | Mongoose `timestamps: true` |
+Created via `notificationService.createNotification` — no-ops on self-notifications (e.g. liking your own post).
+
+### Conversation / Message
+Unchanged, indexed on `participants`.
 
 ---
 
 ## API Endpoints
 
-### Auth (`/api/auth`) — PUBLIC
-| Method | Path        | Controller      | Description |
-|--------|------------|-----------------|-------------|
-| POST   | /register  | register        | Create new user, send welcome email, generate OTP |
-| POST   | /login     | login           | Authenticate, set JWT cookies |
-| GET    | /logout    | logout          | Clear `token` cookie |
-| GET    | /validate  | validate        | Check if token is valid |
+### Auth (`/api/auth`)
+| Method | Path | Protected | Description |
+|--------|------|-----------|-------------|
+| POST | /register | No | Rate-limited, validated |
+| POST | /login | No | Rate-limited, validated |
+| GET | /logout | No | |
+| GET | /validate | No | |
+| POST | /send-verify-otp | Yes | |
+| POST | /verify-email | Yes | body: `{ otp }` |
+| POST | /send-reset-otp | No | Rate-limited, body: `{ email }` |
+| POST | /reset-password | No | Rate-limited, body: `{ email, otp, newPassword }` |
 
-### Posts (`/api/post`) — PROTECTED
-| Method | Path                | Controller    | Description |
-|--------|---------------------|--------------|-------------|
-| POST   | /create             | createPost   | Create post (multipart, `pic` field) |
-| GET    | /currentUser        | getUserPosts | Get logged-in user's posts |
-| GET    | /getUserPosts/:userId | getUserPosts | Get any user's posts |
-| GET    | /feed               | feedPosts    | Get posts from followed users |
-| GET    | /search?q=          | searchPosts  | Search posts by title/content |
-| GET    | /                   | getPosts     | Get all posts |
-| GET    | /:id                | getPostById  | Get single post |
-| PUT    | /update/:id         | updatePost   | Update post |
-| PUT    | /:postId/like       | likePost     | Toggle like/unlike |
-| POST   | /:postId/comment    | commentPost  | Add comment |
-| DELETE | /:id                | deletePost   | Delete post |
+### Posts (`/api/post`) — all protected, paginated list endpoints return `{ posts, page, limit, total, hasMore }`
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /create | multipart, field `pic` |
+| GET | /currentUser | caller's own posts |
+| GET | /getUserPosts/:userId | any user's posts (fixed — used to ignore `:userId`) |
+| GET | /feed | own + followed users' posts, single indexed query (fixed — used to build a nested array) |
+| GET | /search?q= | |
+| GET | / | all posts |
+| GET | /:id | single post |
+| PUT | /update/:id | author-only, optional new `pic` |
+| PUT | /:postId/like | toggles, notifies author |
+| POST | /:postId/comment | notifies author |
+| DELETE | /:id | author-only |
 
-### Users (`/api/user`) — PROTECTED
-| Method | Path                    | Controller    | Description |
-|--------|------------------------|--------------|-------------|
-| GET    | /getAllUsers            | getAllUsers   | List all users |
-| GET    | /me                    | inline handler | Get logged-in user info |
-| GET    | /:id                   | getUser      | Get user by ID |
-| PUT    | /:followUserId/follow  | followUser   | Follow a user |
-| PUT    | /:unfollowUserId/unfollow | unfollowUser | Unfollow a user |
-| PUT    | /:id                   | updateUser   | Update user profile |
-| DELETE | /                      | deleteUser   | Delete own account |
+### Users (`/api/user`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /getAllUsers | |
+| GET | /me | includes `following`/`followers` for client-side follow-state checks |
+| GET | /search?q= | |
+| GET | /:id | |
+| PUT | /:followUserId/follow | notifies |
+| PUT | /:unfollowUserId/unfollow | |
+| PUT | /:id | self-only, whitelisted fields (`name`, `bio`, `pic`), optional avatar upload |
+| DELETE | / | cascades: deletes own posts, pulls self from others' follow lists, deletes own notifications |
 
-### Profile (`/api/myProfile`) — PROTECTED
-| Method | Path   | Controller  | Description |
-|--------|--------|------------|-------------|
-| GET    | /:id   | getProfile | Get user profile |
+### Profile (`/api/myProfile`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /:id | aggregated stats: `followersCount`, `followingCount`, `postsCount`, `isFollowing`, `isSelf` |
 
-### Messages (`/api/messages`) — PROTECTED
-| Method | Path         | Controller        | Description |
-|--------|-------------|-------------------|-------------|
-| GET    | /users      | getUsersForSidebar| Get all users (except self) |
-| GET    | /:id        | getMessages       | Get conversation messages |
-| POST   | /send/:id   | sendMessage       | Send message + emit via socket |
+### Messages (`/api/messages`) — unchanged endpoints, logic moved into `messageService.js`
+
+### Notifications (`/api/notifications`) — new
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | / | latest 50, populated sender + post |
+| GET | /unread-count | |
+| PUT | /read-all | |
+| PUT | /:id/read | |
 
 ---
 
 ## Socket.io Events
 
-| Event           | Direction     | Payload              | Description |
-|----------------|--------------|----------------------|-------------|
-| connection     | Client → Server | `query: { userId }` | Register user socket |
-| disconnect     | Client → Server | —                   | Remove from online map |
-| getOnlineUsers | Server → All   | `string[]` (userIds) | Broadcast online users |
-| newMessage     | Server → Client | `Message` object    | Push new message to receiver |
+Unchanged: `connection` (query `userId`), `getOnlineUsers` broadcast, `newMessage` to the receiver's socket, `disconnect`.
 
 ---
 
 ## Environment Variables
 
-| Variable               | Used In           | Status |
-|-----------------------|-------------------|--------|
-| PORT                  | server.js         | ✅ Defined |
-| DB_Host               | dbConfig.js       | ✅ Defined |
-| DB_Pass               | dbConfig.js       | ✅ Defined |
-| DB_Name               | dbConfig.js       | ✅ Defined |
-| JWT_SECRET            | authService, authMiddleware | ✅ Defined |
-| JWT_REFRESH_SECRET    | authService, authMiddleware | ⚠️ **MISSING FROM .env** |
-| NODE_ENV              | authService, authMiddleware | ✅ Defined |
-| SMTP_USER             | authService       | ✅ Defined |
-| SMTP_PASS             | .env only         | ✅ Defined but unused (nodemailer.js hardcodes Mailtrap) |
-| SMTP_PORT             | .env only         | ✅ Defined but unused |
-| SENDER_EMAIL          | .env only         | ✅ Defined but unused |
-| CLOUDINARY_CLOUD_NAME | cloudinaryConfig  | ⚠️ **MISSING** (has hardcoded fallback) |
-| CLOUDINARY_API_KEY    | cloudinaryConfig  | ⚠️ **MISSING** (has hardcoded fallback) |
-| CLOUDINARY_API_SECRET | cloudinaryConfig  | ⚠️ **MISSING** (has hardcoded fallback) |
-
----
-
-## Known Issues & Bugs (Critical)
-
-### 🔴 P0 — Will Cause Errors
-
-1. **Double response in auth controllers**: `authService.js` sends responses directly via `res.status().json()`, but `authController.js` also calls `res.status(result.status).json(result)`. This causes "Cannot set headers after they are sent" errors for login/logout/validate.
-
-2. **`register` missing `res` param**: `authController.js` line 4 calls `registerUser(req.body)` but the service signature is `registerUser({ name, email, password, pic }, res)`. The service tries to call `res.status()` on `undefined`.
-
-3. **`JWT_REFRESH_SECRET` missing from `.env`**: `authMiddleware.js` and `authService.js` use `process.env.JWT_REFRESH_SECRET` to sign/verify refresh tokens, but it's never defined. Refresh token operations will fail.
-
-4. **`refreshAccessToken` verifies with wrong secret**: `authService.js` line 154 uses `JWT_SECRET` instead of `JWT_REFRESH_SECRET`.
-
-5. **`post.model.js` comment `createdAt` bug**: Line 51 uses `Date.now()` (immediately invoked) instead of `Date.now` (function reference). All comments will share the same timestamp from server boot.
-
-### 🟡 P1 — Security
-
-6. **Hardcoded credentials in source**: `cloudinaryConfig.js` has API keys as fallback values. `nodemailer.js` has Mailtrap credentials hardcoded.
-
-7. **`.env.sample` contains real credentials**: Should contain placeholder values only.
-
-8. **`authMiddleware.js` logs entire `req` object**: Line 6 (`console.log(req)`) will dump massive output on every protected request.
-
-### 🟠 P2 — Code Quality
-
-9. **Duplicate bcrypt packages**: Both `bcrypt` and `bcryptjs` in dependencies. Only `bcryptjs` is imported.
-
-10. **Wrong nodemailer package**: `node-mailer` (0.1.1) is installed instead of `nodemailer`. The import `import nodemailer from 'nodemailer'` likely resolves to the wrong package or fails.
-
-11. **No message service**: `messageController.js` has DB queries directly — breaks the service layer pattern.
-
-12. **`userController.js` line 30**: Template literal syntax error `$\`post for...\`` — should be backtick template literal.
-
-13. **`console.log` in production paths**: 20+ instances across controllers, services, and middleware.
-
-14. **CORS origins hardcoded in two places**: `app.js` and `server.js` both define CORS origins separately.
+See `README.md` and `.env.sample` for the full list. Key points:
+- `MONGO_URI` replaces the old `DB_Host`/`DB_Pass`/`DB_Name` SRV-string assembly — a single standard connection string, works for both local (`mongodb://127.0.0.1:27017/chattrix_dev`) and Atlas.
+- `CORS_ORIGINS` is comma-separated, shared between Express CORS and Socket.io CORS via `config/corsConfig.js`.
+- No credential has a hardcoded fallback in source anymore.
 
 ---
 
@@ -262,21 +207,14 @@ backend/
 
 | Pattern                    | Status |
 |---------------------------|--------|
-| Controller → Service → Model | ✅ Mostly followed (except messageController) |
-| Route files per domain     | ✅ Followed |
-| Auth via middleware         | ✅ Followed |
-| ES Module imports          | ✅ Consistent |
-| Named exports in services  | ✅ Consistent |
-| Default export for models  | ✅ Consistent |
-| camelCase naming           | ✅ Consistent |
-| File naming: camelCase     | ✅ Consistent (except models use dot notation: `user.model.js`) |
-
----
+| Controller → Service → Model | ✅ All domains, including messages/notifications |
+| Services never call `res`  | ✅ |
+| Route files per domain     | ✅ |
+| Field-level `select()` exclusion for sensitive fields | ✅ Shared constant, applied everywhere |
+| Rate limiting on auth      | ✅ |
+| Centralized error handler + 404 | ✅ |
+| Pagination on list endpoints | ✅ |
 
 ## Code Style
 
-- **Quotes**: Single quotes for strings
-- **Semicolons**: Inconsistent (most files use them, some don't)
-- **Indentation**: 4 spaces in models/services, 2 spaces in some controllers
-- **Trailing commas**: Inconsistent
-- **Exports**: Services use named exports, models/config use default exports
+Single quotes, 4-space indentation in models/services, ES modules, named exports for services, default exports for models/config.

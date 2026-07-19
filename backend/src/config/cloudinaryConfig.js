@@ -1,26 +1,37 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-// Default fallback configuration in case .env doesn't have these yet
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'df7pwlxo2',
-  api_key: process.env.CLOUDINARY_API_KEY || '629828552697914',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'g3rJ_C2ZIfxRY5s6aDWeHtcF05U',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'chattrix_posts',
-    allowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 1000, crop: 'limit' }],
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG, PNG, and WEBP images are allowed'));
+    }
   },
 });
 
-const upload = multer({ storage: storage });
+export const uploadBufferToCloudinary = (buffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, transformation: [{ width: 1000, crop: 'limit' }] },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 export default upload;

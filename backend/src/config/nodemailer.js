@@ -1,14 +1,12 @@
 import nodemailer from 'nodemailer';
 
-
-// Looking to send emails in production? Check out our Email API/SMTP product!
-var transporter= nodemailer.createTransport({
-    host: "sandbox.smtp.mailtrap.io",
-    port: 2525,
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+    port: Number(process.env.SMTP_PORT) || 587,
     auth: {
-      user: "978d42adbb9a85",
-      pass: "5c65841d98bef2"
-    }
-  });
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+});
 
-export default transporter; 
+export default transporter;

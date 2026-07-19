@@ -16,7 +16,7 @@
 
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-muted: #7c8ba3; /* bumped from #64748b — old value was 3.8:1 on --bg-secondary, fails WCAG AA (4.5:1) */
 
   --border-color: rgba(255, 255, 255, 0.12);
   --border-glow: rgba(124, 58, 237, 0.6);
@@ -37,11 +37,9 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* Reset lives in App.css's @layer base — this file isn't part of the
+   Tailwind-processed entry, so an unlayered rule here would silently
+   outrank every Tailwind padding/margin utility app-wide (Cascade Layers). */
 
 body {
   background-color: var(--bg-primary);
@@ -51,6 +49,13 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* ===== Keyboard focus ===== */
+:focus-visible {
+  outline: 2px solid var(--accent-secondary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ===== Scrollbar ===== */

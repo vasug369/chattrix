@@ -1,20 +1,19 @@
 # Frontend Context — Chattrix
 
-> Auto-generated from codebase analysis on 2026-04-25. This is the single source of truth for frontend architecture decisions.
+> Updated 2026-07-19 after the production-hardening pass. Single source of truth for frontend architecture decisions.
 
 ---
 
 ## Stack
 
-| Layer        | Technology               | Version   |
-|-------------|--------------------------|-----------|
-| Framework   | React                    | 19.1.0    |
-| Build Tool  | Vite                     | 6.3.5     |
-| Routing     | React Router DOM         | 7.6.0     |
-| Styling     | Tailwind CSS v4 + CSS Variables | 4.1.6 |
-| HTTP Client | Axios                    | 1.9.0     |
-| Realtime    | socket.io-client         | 4.8.3     |
-| Module System | ES Modules             | —         |
+| Layer        | Technology        |
+|-------------|--------------------|
+| Framework   | React 19           |
+| Build Tool  | Vite 6             |
+| Routing     | React Router DOM 7 |
+| Styling     | Tailwind CSS v4 + CSS custom properties |
+| HTTP Client | Axios (centralized instance) |
+| Realtime    | socket.io-client    |
 
 ---
 
@@ -22,132 +21,90 @@
 
 ```
 frontend/
-├── .env                    # Production API URL
-├── .env.local              # Local dev overrides
-├── index.html              # Entry HTML (Google Fonts loaded here)
-├── vite.config.js          # Vite + React + Tailwind plugins
+├── .env                    # Local dev API URL (VITE_API_BASE_URL=http://localhost:3000)
+├── .env.production          # Production build API URL (Render backend)
+├── vite.config.js
 ├── package.json
 └── src/
-    ├── main.jsx             # React root render
-    ├── App.jsx              # Router + route definitions
-    ├── App.css              # Tailwind import + custom font classes
-    ├── index.css            # Design system (CSS variables, glass, animations)
-    ├── assets/              # Static assets
+    ├── main.jsx
+    ├── App.jsx              # Router + route definitions, wraps AuthProvider/ToastProvider
+    ├── api/
+    │   └── axios.js         # Centralized axios instance — baseURL from VITE_API_BASE_URL, withCredentials
+    ├── context/
+    │   ├── AuthContext.jsx  # Single source of truth for the logged-in user; login/logout/refreshUser/isFollowing
+    │   └── ToastContext.jsx # Toast notifications — replaces alert()
+    ├── index.css            # Design system (unchanged)
     └── components/
-        ├── Login.jsx        # Auth page (sign in / sign up toggle)
-        ├── Dashboard.jsx    # Feed page (main, 562 lines ⚠️)
-        ├── Dashboard2.jsx   # ⚠️ DEAD CODE — unused prototype
-        ├── CreatePost.jsx   # Post creation form with image upload
-        ├── Profile.jsx      # User profile + their posts
-        ├── Messages.jsx     # Real-time chat interface
-        ├── FollowButton.jsx # ⚠️ UNUSED — standalone follow component
-        └── ProtectedRoutes.jsx # Auth guard (exists but DISABLED in App.jsx)
+        ├── layout/
+        │   └── AppLayout.jsx    # Shared header + sidebar + notification bell for every authenticated page
+        ├── Login.jsx
+        ├── ForgotPassword.jsx   # New — two-step OTP reset flow
+        ├── VerifyEmail.jsx      # New
+        ├── Dashboard.jsx        # Feed
+        ├── EditPostModal.jsx    # New — replaces window.prompt() editing
+        ├── CreatePost.jsx
+        ├── Profile.jsx          # Now handles both /profile and /profile/:userId
+        ├── Settings.jsx         # New — edit profile + delete account
+        ├── Search.jsx           # New — find people
+        ├── Notifications.jsx    # New
+        ├── Messages.jsx
+        ├── NotFound.jsx         # New — 404 fallback
+        └── ProtectedRoutes.jsx  # Now reads AuthContext instead of its own fetch
 ```
+
+**Removed** (dead code): `Dashboard2.jsx`, `FollowButton.jsx` — unreferenced prototypes.
 
 ---
 
 ## Routing
 
-| Path           | Component   | Protected | Notes |
-|---------------|-------------|-----------|-------|
-| `/`           | Login       | No        | — |
-| `/dashboard`  | Dashboard   | ⚠️ Disabled | `<ProtectedRoute>` commented out |
-| `/create-post`| CreatePost  | ⚠️ Disabled | `<ProtectedRoute>` commented out |
-| `/profile`    | Profile     | ⚠️ Disabled | `<ProtectedRoute>` commented out |
-| `/messages`   | Messages    | ⚠️ Disabled | `<ProtectedRoute>` commented out |
+| Path | Component | Protected |
+|------|-----------|-----------|
+| `/` | Login | No |
+| `/forgot-password` | ForgotPassword | No |
+| `/verify-email` | VerifyEmail | Yes |
+| `/dashboard` | Dashboard | Yes |
+| `/create-post` | CreatePost | Yes |
+| `/profile`, `/profile/:userId` | Profile | Yes |
+| `/messages` | Messages | Yes |
+| `/search` | Search | Yes |
+| `/notifications` | Notifications | Yes |
+| `/settings` | Settings | Yes |
+| `*` | NotFound | No |
+
+`ProtectedRoute` reads `status` from `AuthContext` (`'loading' | 'authenticated' | 'unauthenticated'`) — no more per-component `validate` fetches.
 
 ---
 
-## Design System (`index.css`)
+## State Management
 
-### Color Palette (CSS Variables)
-```
---bg-primary:       #0a0a1b       (deep navy)
---bg-secondary:     #13132e       (sidebar)
---bg-card:          rgba(255,255,255,0.05)
---bg-card-hover:    rgba(255,255,255,0.08)
---bg-input:         rgba(255,255,255,0.07)
---bg-input-focus:   rgba(255,255,255,0.12)
---accent-primary:   #7c3aed       (purple)
---accent-secondary: #3b82f6       (blue)
---accent-gradient:  linear-gradient(135deg, #7c3aed, #3b82f6)
---text-primary:     #f1f5f9
---text-secondary:   #94a3b8
---text-muted:       #64748b
---border-color:     rgba(255,255,255,0.12)
---danger:           #ef4444
---success:          #22c55e
-```
-
-### Typography
-- Primary: `Poppins` (Google Fonts, weights 300–900)
-- Accent: `Cedarville Cursive` (decorative)
-- Utility classes: `.font-poppins`, `.font-credera`
-
-### Reusable Classes
-- `.glass` — Glassmorphism card (blur 20px, border, rounded-16px)
-- `.glass-strong` — Heavy glass (blur 40px, rounded-20px)
-- `.animate-fade-in-up` — 0.6s fade + translate Y
-- `.animate-fade-in` — 0.4s opacity
-- `.animate-slide-in` — 0.5s slide from left
-- `.stagger-children` — Delays children 0–320ms
-- `.flying-heart` — Like animation (floats up and fades)
+- **`AuthContext`**: fetches `/api/user/me` on mount (includes `following`/`followers` arrays), exposes `login()`, `logout()`, `refreshUser()`, and `isFollowing(userId)` — used everywhere a follow button needs to know its state, instead of each page tracking it independently.
+- **`ToastContext`**: `showToast(message, type)` — used in place of `alert()` for all error/success feedback across the app.
 
 ---
 
-## Styling Pattern
+## Design System (`index.css`) — unchanged
 
-**Hybrid: Tailwind CSS v4 utilities + CSS custom properties + inline `style={}`**
+Same glassmorphism / purple-blue gradient system as before: CSS variables (`--bg-primary`, `--accent-gradient`, etc.), `.glass` / `.glass-strong` utility classes, fade/slide animations, `.flying-heart` like animation. All new pages (Settings, Search, Notifications, ForgotPassword, VerifyEmail) follow this exact pattern — no new design system was introduced.
 
-- Layout and spacing → Tailwind classes (`className`)
-- Theme colors → CSS variables via `style={{ color: 'var(--text-primary)' }}`
-- Interactive states (hover/focus) → `onMouseEnter`/`onMouseLeave` handlers mutating `e.target.style`
-- Glass effects → `.glass` / `.glass-strong` utility classes
+---
 
-> **Note**: This is an unusual pattern. Hover effects should use CSS `:hover` instead of JS event handlers. The inline style approach is used consistently, so follow it for consistency until a refactor is approved.
+## Styling Pattern — unchanged
+
+Hybrid: Tailwind utilities for layout/spacing, CSS variables via inline `style={}` for theme colors, `.glass` classes for cards. Followed consistently in all new components for visual continuity with the original app.
 
 ---
 
 ## Environment Variables
 
-| Variable           | File       | Used In  | Status |
-|-------------------|-----------|----------|--------|
-| VITE_API_BASE_URL | .env      | Nowhere  | ⚠️ **DEFINED BUT NEVER IMPORTED** |
-| VITE_API_BASE_URL | .env.local| Nowhere  | ⚠️ **DEFINED BUT NEVER IMPORTED** |
+| File | Used by | Value |
+|------|---------|-------|
+| `.env` | `npm run dev` | `http://localhost:3000` |
+| `.env.production` | `npm run build` | Deployed Render backend URL |
 
----
+Both consumed via `import.meta.env.VITE_API_BASE_URL` in `src/api/axios.js` and `Messages.jsx` (Socket.io connection) — no component hardcodes a backend URL anymore.
 
-## Known Issues & Gaps
-
-### 🔴 P0 — Broken Functionality
-
-1. **Hardcoded base URLs everywhere**: Every component has its own `const baseURL = 'http://localhost:3000'` or the render.com production URL. The `VITE_API_BASE_URL` env var exists but is **never used**. `Login.jsx` points to production (`https://chattrix-2.onrender.com`), while all other components point to `localhost:3000`.
-
-2. **ProtectedRoute is disabled**: All routes in `App.jsx` have `<ProtectedRoute>` commented out. Any unauthenticated user can navigate directly to `/dashboard`, `/messages`, etc.
-
-3. **No centralized API service**: Every component calls `axios.get/post` directly with its own hardcoded URL. There is no `src/services/api.js`.
-
-### 🟡 P1 — Architecture Gaps
-
-4. **No AuthContext**: Auth state (user ID, name, email, token validity) is fetched independently in each component via `GET /api/auth/validate`. There is no shared auth state.
-
-5. **No form validation library**: All forms use raw `useState` + manual validation. No React Hook Form, no Zod schemas.
-
-6. **No error handling strategy**: Errors are caught with `console.log` or raw `alert()`. No toast system, no error boundaries.
-
-7. **Dashboard.jsx is 562 lines**: Contains header, sidebar, feed, post cards, comments, actions — all in one component. Should be decomposed.
-
-### 🟠 P2 — Code Quality
-
-8. **Dead code**: `Dashboard2.jsx` is a prototype with placeholder data, not imported anywhere. `FollowButton.jsx` uses relative API paths and inline styles (doesn't match project style), not imported anywhere.
-
-9. **Unused imports**: `App.jsx` imports `useState`, `reactLogo`, `viteLogo` — none are used. Has unused `count`/`setCount` state.
-
-10. **Socket.io URL hardcoded**: `Messages.jsx` line 38 hardcodes `http://localhost:3000` for the socket connection.
-
-11. **No loading/skeleton states**: Components show plain text "Loading..." or nothing while fetching.
-
-12. **Inline nav items array duplicated**: The `navItems` array is copy-pasted identically in Dashboard, CreatePost, Profile, and Messages.
+> **Previous bug**: `.env.local` was pointing local dev at the *production* backend due to Vite's env-file precedence (`.env.local` always wins over `.env`). Removed; the dev/prod split now lives in `.env` / `.env.production` where it belongs.
 
 ---
 
@@ -155,21 +112,13 @@ frontend/
 
 | Pattern                    | Status |
 |---------------------------|--------|
-| Functional components only | ✅ Consistent |
-| Hooks for state            | ✅ Consistent |
-| Single-file components     | ✅ Consistent (no separation of logic/view) |
-| Direct axios in components | ❌ Should use centralized service |
-| PascalCase component files | ✅ Consistent |
-| Default exports            | ✅ Consistent |
-| JSX extension (.jsx)       | ✅ Consistent |
-
----
+| Functional components, hooks | ✅ |
+| Centralized API client (`api/axios.js`) | ✅ — no more direct `axios.get/post` with hardcoded URLs |
+| Shared layout (`AppLayout`) | ✅ — eliminated the header/sidebar/`navItems` duplication that previously existed identically across 4 files |
+| Auth state via context | ✅ |
+| Toasts instead of `alert()` | ✅ |
+| PascalCase component files, default exports | ✅ |
 
 ## Code Style
 
-- **Quotes**: Single quotes
-- **Semicolons**: Yes (consistent)
-- **Indentation**: 2 spaces
-- **Imports**: React at top, then libraries, then local
-- **Component pattern**: `function ComponentName() { ... }` (function declarations, not arrow)
-- **Export style**: `export default ComponentName` at bottom
+Single quotes, semicolons, 2-space indentation — unchanged from the original codebase conventions.

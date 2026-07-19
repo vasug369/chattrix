@@ -1,73 +1,77 @@
 import mongoose from "mongoose";
 
-const userSchema=new mongoose.Schema({
-    name:{
-        type:String,
-        required:true,
-        trim:true
-
+const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true
     },
-    email:{
-        type:String,
-        required:true,
-        unique:true
-
-
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true
     },
-    password:{
-        type:String,
-        required:true
-
+    password: {
+        type: String,
+        required: true
     },
 
-    pic:{
-        type:String,
-        default:"https://iconarchive.com/download/i107272/Flat-UI-Icons/User-Interface/user.ico"
+    pic: {
+        type: String,
+        default: ""
     },
 
-    followers:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User"
+    bio: {
+        type: String,
+        default: "",
+        maxlength: 160,
+        trim: true
+    },
+
+    followers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
     }],
 
-    following:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User"
+    following: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
     }],
 
-    verifyOtp:{ 
-        type:String,
-        default:""
+    verifyOtp: {
+        type: String,
+        default: ""
     },
 
-    verifyOtpExpiry:{
-        type:Date,
-        default:0
+    verifyOtpExpireAt: {
+        type: Date,
+        default: 0
     },
 
-    isAccountVerified:{
-        type:Boolean,
-        default:false
+    isAccountVerified: {
+        type: Boolean,
+        default: false
     },
 
-    resetOtp:{
-        type:String,
-        default:""
+    resetOtp: {
+        type: String,
+        default: ""
     },
 
-    resetOtpExpiry:{
-        type:Date,
-        default:0
+    resetOtpExpireAt: {
+        type: Date,
+        default: 0
     },
 
-    createdAt:{
-        type:Date,
-        default:Date.now
-
+    createdAt: {
+        type: Date,
+        default: Date.now
     }
 
-})
+});
 
-const User=mongoose.model('User',userSchema);
+const User = mongoose.model('User', userSchema);
 
 export default User;
