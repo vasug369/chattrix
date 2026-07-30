@@ -156,3 +156,11 @@ sketch
 
 
 # End of https://www.toptal.com/developers/gitignore/api/react,node
+
+### Internal planning / prep docs (kept locally, never committed) ###
+BRD.md
+PRD.md
+FRD.md
+backend-context.md
+frontend-context.md
+*-context.md
