@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
-import { sendMail } from '../config/nodemailer.js';
+import { queueMail } from '../config/mailer.js';
 import User from '../models/user.model.js';
 import { badRequest, conflict, unauthorized } from '../utils/AppError.js';
 import { compareOtp, generateOtp, hashOtp, isExpired, otpExpiry } from '../utils/otp.js';
@@ -76,7 +76,9 @@ export const registerUser = async ({ name, email, password, pic }) => {
     isAccountVerified: false,
   });
 
-  await sendMail({ to: email, ...otpEmail(name, otp, 'verify') });
+  // Fire-and-forget: the account exists either way, and awaiting the
+  // provider previously added its full timeout to every registration.
+  queueMail({ to: email, ...otpEmail(name, otp, 'verify') });
 
   return user;
 };
@@ -113,7 +115,7 @@ export const sendVerificationOtp = async (email) => {
   user.otpAttempts = 0;
   await user.save();
 
-  await sendMail({ to: email, ...otpEmail(user.name, otp, 'verify') });
+  queueMail({ to: email, ...otpEmail(user.name, otp, 'verify') });
   return { sent: true };
 };
 
@@ -155,7 +157,7 @@ export const requestPasswordReset = async (email) => {
   user.otpAttempts = 0;
   await user.save();
 
-  await sendMail({ to: email, ...otpEmail(user.name, otp, 'reset') });
+  queueMail({ to: email, ...otpEmail(user.name, otp, 'reset') });
   return { sent: true };
 };
 

@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import User from '../src/models/user.model.js';
-import * as mailer from '../src/config/nodemailer.js';
+import * as mailer from '../src/config/mailer.js';
 import { VALID_PASSWORD, app, createUser, request } from './helpers.js';
 
 /**
  * Codes are stored as bcrypt hashes, so tests cannot read them back out of the
  * database. Instead we intercept the outgoing mail and pull the code from the
  * body — which also asserts the user actually receives it.
+ *
+ * Spies on queueMail rather than sendMail: the services hand mail off without
+ * awaiting it, so queueMail is the seam the request path actually crosses.
  */
 const captureOtp = () => {
-  const spy = vi.spyOn(mailer, 'sendMail');
+  const spy = vi.spyOn(mailer, 'queueMail');
   return {
     spy,
     latest() {
