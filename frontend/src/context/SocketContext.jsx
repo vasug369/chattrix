@@ -13,7 +13,7 @@ const SocketContext = createContext(null);
  * navigating away silently dropped the connection.
  */
 export function SocketProvider({ children }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -42,17 +42,32 @@ export function SocketProvider({ children }) {
     setSocket(s);
 
     s.on('getOnlineUsers', setOnlineUsers);
+
+    // The server closes this socket when the session behind it is revoked from
+    // another device. Without handling it, the page kept rendering as though
+    // signed in until the user happened to navigate or reload — which is
+    // exactly what made a remote sign-out look like it had not worked.
+    s.on('session:revoked', () => {
+      // logout() rather than setUser(null): `isAuthenticated` is derived from
+      // `status`, not from `user`, so clearing the user alone would leave the
+      // route guard thinking the session is still good. It also clears this
+      // browser's now-useless cookies — /auth/logout is deliberately not behind
+      // the auth middleware, so it still works with a dead session.
+      s.disconnect();
+      logout();
+    });
     s.on('notification:new', (n) => setLatestNotification(n));
     s.on('notification:count', ({ unread }) => setUnreadNotifications(unread));
 
     return () => {
       s.off('getOnlineUsers');
+      s.off('session:revoked');
       s.off('notification:new');
       s.off('notification:count');
       s.disconnect();
       socketRef.current = null;
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, logout]);
 
   // Seed the badge on load; sockets only deliver changes from that point on.
   useEffect(() => {
