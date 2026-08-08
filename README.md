@@ -1,6 +1,6 @@
 # Chattrix
 
-A social media platform with microblogging + real-time messaging, built with React 19 and Node.js/Express 5.
+A social platform combining microblogging with real-time messaging, built with React 19 and Node.js/Express 5.
 
 ---
 
@@ -10,6 +10,8 @@ A social media platform with microblogging + real-time messaging, built with Rea
 |------------|------------|
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
 | Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
+| Validation | Zod (every endpoint) |
+| Testing    | Vitest + Supertest + mongodb-memory-server (107 tests) |
 | Database   | MongoDB Atlas |
 | Deployment | Frontend: Vercel · Backend: Render |
 
@@ -19,30 +21,33 @@ A social media platform with microblogging + real-time messaging, built with Rea
 
 ```
 chattrix/
-├── backend/               # Express API + Socket.io server
+├── backend/
 │   ├── src/
-│   │   ├── server.js      # Entry point, HTTP + Socket.io
-│   │   ├── app.js         # Express app, routes
-│   │   ├── config/        # DB, Cloudinary, Nodemailer
-│   │   ├── models/        # Mongoose schemas
-│   │   ├── controllers/   # Request handlers
-│   │   ├── services/      # Business logic
-│   │   ├── middlewares/    # Auth middleware
-│   │   └── routes/        # Route definitions
-│   ├── .env
+│   │   ├── server.js         # Entry point — the only file that binds a port
+│   │   ├── app.js            # Express app, middleware chain, route mounting
+│   │   ├── config/           # env (validated), DB, Cloudinary, Nodemailer
+│   │   ├── models/           # Mongoose schemas
+│   │   ├── controllers/      # HTTP layer: read request, send response
+│   │   ├── services/         # Business logic; returns values, throws AppError
+│   │   ├── middlewares/      # auth, validate, errorHandler, rateLimiters
+│   │   ├── validation/       # Zod schemas per resource
+│   │   ├── realtime/         # Socket.io registry (decoupled from server.js)
+│   │   ├── routes/           # Route definitions
+│   │   └── utils/            # AppError, asyncHandler, otp, sanitize
+│   ├── tests/                # Integration suites
+│   ├── .env.example
 │   └── package.json
-├── frontend/              # React SPA
+├── frontend/
 │   ├── src/
-│   │   ├── main.jsx       # React root
-│   │   ├── App.jsx        # Router
-│   │   ├── index.css      # Design system
-│   │   └── components/    # All page components
-│   ├── .env / .env.local
+│   │   ├── App.jsx           # Router + providers
+│   │   ├── index.css         # "Aurora Glass" design system
+│   │   ├── lib/api.js        # The single axios instance
+│   │   ├── context/          # AuthContext, SocketContext
+│   │   └── components/
+│   │       └── ui/           # Glass primitives, Aurora background
+│   ├── .env.example
 │   └── package.json
-├── docs/                  # Static build (old deployment)
-├── backend-context.md     # Backend architecture docs
-├── frontend-context.md    # Frontend architecture docs
-└── PRD.md                 # Product requirements
+└── PRD.md / BRD.md / *-context.md
 ```
 
 ---
@@ -51,66 +56,138 @@ chattrix/
 
 ### Prerequisites
 - Node.js 18+
-- MongoDB Atlas cluster (or local MongoDB)
-- Cloudinary account (for image uploads)
+- MongoDB (Atlas cluster or local `mongod`)
+- Cloudinary account (optional — uploads are disabled without it, everything else works)
 
-### Backend Setup
+### Backend
 
 ```bash
 cd backend
-cp .env.sample .env
-# Edit .env with your actual credentials (see Environment Variables below)
+cp .env.example .env
+# Fill in JWT_SECRET and JWT_REFRESH_SECRET at minimum:
+#   openssl rand -hex 32
 npm install
-npm run dev        # Starts with nodemon on port 3000
+npm run dev        # nodemon, port 3000
 ```
 
-### Frontend Setup
+The server validates its configuration at boot and refuses to start with a
+precise error if anything is missing, rather than failing later with an
+opaque 500.
+
+### Frontend
 
 ```bash
 cd frontend
-# Edit .env to point to your backend
+cp .env.example .env
 npm install
-npm run dev        # Starts Vite dev server on port 5173
+npm run dev        # Vite, port 5173
 ```
+
+### Tests
+
+```bash
+cd backend
+npm test           # 107 integration tests, ~4s
+npm run test:watch
+npm run test:coverage
+```
+
+Tests run against a real MongoDB started in-process by `mongodb-memory-server`.
+If the machine already has a `mongod`, it is reused (see `tests/globalSetup.js`)
+rather than downloading one; override with `MONGOMS_SYSTEM_BINARY`.
 
 ---
 
-## Environment Variables
+## Architecture Notes
 
-### Backend (`backend/.env`)
+**Services return, controllers respond.** Services never touch `res`; they
+return values or throw an `AppError` carrying an HTTP status. A single
+`errorHandler` turns anything thrown into a response, so no handler echoes raw
+Mongoose messages back to clients.
 
-```env
-PORT=3000
+**Validation is a boundary, not a suggestion.** Every route runs its payload
+through a Zod schema that *replaces* `req.body` / `req.params` with the parsed
+result, so downstream code only ever sees coerced, trimmed, whitelisted data.
+Query strings land on `req.validatedQuery` (Express 5 makes `req.query`
+read-only). Profile updates use `.strict()`, so unknown fields are rejected
+outright rather than silently reaching a Mongoose update.
 
-# MongoDB Atlas
-DB_Host=<atlas_username>
-DB_Pass=<atlas_password>
-DB_Name=chattrix
+**Sockets are decoupled from the HTTP server.** Handlers import
+`realtime/socket.js`, never `server.js`. Importing a route therefore does not
+start a listener or open a database connection, which is what makes the app
+testable with Supertest.
 
-# JWT
-JWT_SECRET=<your_jwt_secret>
-JWT_REFRESH_SECRET=<your_refresh_secret>    # ⚠️ REQUIRED but missing from current .env
-NODE_ENV=development
+**Secrets come from the environment only.** No credential has a hardcoded
+fallback. Where a service is unconfigured (mail, Cloudinary) the app degrades
+loudly and predictably instead of pointing at somebody else's account.
 
-# Email (Nodemailer)
-SMTP_USER=<smtp_user>
-SMTP_PASS=<smtp_password>
-SMTP_PORT=587
-SENDER_EMAIL=<your_email>
+---
 
-# Cloudinary (currently hardcoded as fallback — should be in .env)
-CLOUDINARY_CLOUD_NAME=<cloud_name>
-CLOUDINARY_API_KEY=<api_key>
-CLOUDINARY_API_SECRET=<api_secret>
-```
+## API
 
-### Frontend (`frontend/.env`)
+All routes are under `/api`. Everything except `/api/auth/*` and
+`/api/health` requires a session cookie.
 
-```env
-VITE_API_BASE_URL=http://localhost:3000
-```
+### Auth
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/auth/register` | Create an account; sends a verification code |
+| POST | `/auth/login` | Sets httpOnly access + refresh cookies |
+| POST | `/auth/logout` | Clears both cookies |
+| GET  | `/auth/validate` | Session probe |
+| POST | `/auth/refresh` | Rotate tokens |
+| POST | `/auth/send-verify-otp` | (Re)issue an email verification code |
+| POST | `/auth/verify-email` | Redeem a verification code |
+| POST | `/auth/forgot-password` | Issue a password-reset code |
+| POST | `/auth/reset-password` | Redeem it; revokes all existing sessions |
 
-> ⚠️ **Known issue**: `VITE_API_BASE_URL` is defined but not used by any component. All components hardcode their base URL.
+### Posts
+`POST /post/create` · `GET /post` · `GET /post/feed` · `GET /post/search?q=`
+· `GET /post/currentUser` · `GET /post/getUserPosts/:userId` · `GET /post/:id`
+· `PUT /post/update/:id` · `PUT /post/:postId/like` · `POST /post/:postId/comment`
+· `DELETE /post/:id`
+
+Edit and delete require ownership. All list endpoints are paginated
+(`?page=&limit=`, limit capped at 50).
+
+### Users
+`GET /user/me` · `PATCH /user/me` · `DELETE /user/me` · `GET /user/getAllUsers`
+· `GET /user/search?q=` · `GET /user/:id` · `GET /user/is-following/:id`
+· `PUT /user/:id/follow` · `PUT /user/:id/unfollow`
+
+### Messages & Notifications
+`GET /messages/users` · `GET /messages/:id` · `POST /messages/send/:id`
+
+`GET /notifications` · `GET /notifications/unread-count`
+· `PATCH /notifications/:id/read` · `PATCH /notifications/read-all`
+
+### Socket events
+Server emits `getOnlineUsers`, `newMessage`, `messagesRead`,
+`notification:new`, `notification:count`, `typing`, `stopTyping`.
+Client emits `typing`, `stopTyping`.
+
+---
+
+## Design System
+
+The frontend uses a glassmorphism system defined entirely in `src/index.css`,
+built from three layers:
+
+1. **Canvas** — a deep violet-black base
+2. **Aurora** — four large, heavily blurred colour blobs drifting on 24–34s cycles
+3. **Glass** — translucent panels with a gradient fill, a 1px specular top edge, and `backdrop-filter`
+
+Glass only reads as glass when something colourful and uneven sits behind it,
+which is why the aurora layer exists and why panels use gradient fills rather
+than flat greys. The aurora renders once in the app shell, so navigating does
+not restart its animation.
+
+Utilities: `.glass`, `.glass-strong`, `.glass-panel`, `.glass-hover`,
+`.glass-ring`, `.gl-btn`, `.gl-input`, `.gl-skeleton`, `.gl-gradient-text`.
+Components in `src/components/ui/Glass.jsx` wrap these.
+
+Both `prefers-reduced-motion` (stops the drift) and a
+`@supports not (backdrop-filter)` fallback (opaque panels) are handled.
 
 ---
 
@@ -119,28 +196,32 @@ VITE_API_BASE_URL=http://localhost:3000
 ### Backend
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start with nodemon (auto-reload) |
+| `npm run dev` | nodemon, auto-reload |
 | `npm start` | Production start |
+| `npm test` | Run the test suite |
+| `npm run test:watch` | Watch mode |
+| `npm run test:coverage` | Coverage report |
 
 ### Frontend
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Vite dev server (port 5173) |
 | `npm run build` | Production build |
-| `npm run preview` | Preview production build |
+| `npm run preview` | Preview the build |
 | `npm run lint` | ESLint |
 
 ---
 
-## Known Issues
+## Operational Notes
 
-See `backend-context.md` and `frontend-context.md` for detailed issue lists. Critical items:
-
-1. **Auth controller double-response bug** — services send responses directly, then controllers try to send again
-2. **`JWT_REFRESH_SECRET` missing from `.env`** — refresh token operations fail
-3. **All frontend routes unprotected** — `ProtectedRoute` is commented out
-4. **Hardcoded base URLs in every component** — `VITE_API_BASE_URL` env var is unused
-5. **Credentials in source code** — Cloudinary keys and Mailtrap credentials hardcoded
+- **Rotate the leaked credentials.** Cloudinary keys and Mailtrap credentials
+  were previously hardcoded in `src/config/*.js` and are in the git history.
+  They have been moved to `.env`, but anything committed must be treated as
+  compromised and rotated at the provider.
+- **`JWT_SECRET` must be at least 16 characters.** Boot validation enforces
+  this. Rotating it invalidates all existing sessions, which is expected.
+- **`frontend/.env.local` overrides `frontend/.env` in Vite.** If `.env.local`
+  points at the production API, `npm run dev` talks to production.
 
 ---
 
@@ -148,7 +229,7 @@ See `backend-context.md` and `frontend-context.md` for detailed issue lists. Cri
 
 | Document | Purpose |
 |----------|---------|
-| [backend-context.md](./backend-context.md) | Backend architecture, schemas, API endpoints, auth flow |
-| [frontend-context.md](./frontend-context.md) | Frontend architecture, design system, component patterns |
-| [PRD.md](./PRD.md) | Product requirements, feature status, acceptance criteria |
-| [BRD.md](./BRD.md) | Business model, revenue tiers, projections, implementation phases |
+| [PRD.md](./PRD.md) | Product requirements and feature status |
+| [BRD.md](./BRD.md) | Business model and projections |
+| [backend-context.md](./backend-context.md) | Backend architecture reference |
+| [frontend-context.md](./frontend-context.md) | Frontend architecture reference |

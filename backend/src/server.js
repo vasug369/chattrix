@@ -1,52 +1,41 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import http from 'http';
 
+import env from './config/env.js';
 import connectDB from './config/dbConfig.js';
 import app from './app.js';
+import { initSocket } from './realtime/socket.js';
 
-import http from 'http';
-import { Server } from 'socket.io';
-
-connectDB();
-
-const PORT = process.env.PORT || 3000;
-
+/**
+ * Process entry point.
+ *
+ * This module is the only place that binds a port or opens a DB connection.
+ * Handlers that need to push over Socket.io import ./realtime/socket.js
+ * instead of importing this file — the old arrangement (messageController
+ * importing `io` from server.js) meant loading a route started a server.
+ */
 const server = http.createServer(app);
+initSocket(server);
 
-//add https://chattrix-nmlf.vercel.app/ in cors
-export const io = new Server(server, {
-    cors: {
-        origin: ['http://localhost:5173','https://chattrix-nmlf.vercel.app'],
-        methods: ["GET", "POST"],
-        credentials: true
-    }
-});
-
-const userSocketMap = {}; // { userId: socketId }
-
-export const getReceiverSocketId = (receiverId) => {
-    return userSocketMap[receiverId];
+const start = async () => {
+    await connectDB();
+    server.listen(env.PORT, () => {
+        console.log(`Chattrix API listening on http://localhost:${env.PORT}`);
+    });
 };
 
-io.on('connection', (socket) => {
-    console.log(`User Connected: ${socket.id}`);
-
-    const userId = socket.handshake.query.userId;
-    if (userId && userId !== 'undefined') {
-        userSocketMap[userId] = socket.id;
-    }
-
-    io.emit('getOnlineUsers', Object.keys(userSocketMap));
-
-    socket.on('disconnect', () => {
-        console.log('User Disconnected', socket.id);
-        if (userId) {
-            delete userSocketMap[userId];
-            io.emit('getOnlineUsers', Object.keys(userSocketMap));
-        }
-    });
+start().catch((err) => {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
 });
 
-server.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+const shutdown = (signal) => () => {
+    console.log(`\n${signal} received, shutting down`);
+    server.close(() => process.exit(0));
+    // Don't let a hung connection block the exit forever.
+    setTimeout(() => process.exit(1), 10_000).unref();
+};
+
+process.on('SIGINT', shutdown('SIGINT'));
+process.on('SIGTERM', shutdown('SIGTERM'));
+
+export default server;

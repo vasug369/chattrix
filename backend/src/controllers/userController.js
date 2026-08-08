@@ -1,116 +1,100 @@
-import {getAllUsersService,getUserService,updateUserService,followUserService,unfollowUserService, deleteUserService} from '../services/userService.js'
+import {
+    deleteUserService,
+    followUserService,
+    getAllUsersService,
+    getPublicProfileService,
+    isFollowingService,
+    searchUsersService,
+    unfollowUserService,
+    updateUserService,
+} from '../services/userService.js';
+import { notify, removeNotification } from '../services/notificationService.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
+export const getMe = asyncHandler(async (req, res) => {
+    res.status(200).json({
+        success: true,
+        data: {
+            id: req.user._id,
+            name: req.user.name,
+            email: req.user.email,
+            pic: req.user.pic,
+            bio: req.user.bio,
+            isAccountVerified: req.user.isAccountVerified,
+            followerCount: req.user.followers?.length ?? 0,
+            followingCount: req.user.following?.length ?? 0,
+        },
+    });
+});
 
-export const getUser=async(req,res)=>{
-    try{
-        const userId=req.params.id;
-        const user=await getUserService(userId);
-        if(!user){
-            return res.status(404).json({message:"user not found"})
-        }
-        // console.log("User fetched successfully:", req.user);
-        res.status(200).json(user);
+export const getUser = asyncHandler(async (req, res) => {
+    const profile = await getPublicProfileService(req.params.id, req.user._id);
+    res.status(200).json({ success: true, data: profile });
+});
 
+/**
+ * Update the caller's own profile.
+ *
+ * The user id comes from `req.user`, not `req.params` — the previous handler
+ * took it from the URL, so `PUT /api/user/<anyone-elses-id>` updated their
+ * account.
+ */
+export const updateMe = asyncHandler(async (req, res) => {
+    const updated = await updateUserService(req.user._id, req.body);
+    res.status(200).json({ success: true, data: updated });
+});
 
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
+export const followUser = asyncHandler(async (req, res) => {
+    const { user, followUser } = await followUserService(req.user._id, req.params.followUserId);
 
+    await notify({
+        recipient: followUser._id,
+        actor: user._id,
+        type: 'follow',
+        preview: `${user.name} started following you`,
+    });
 
-    }
+    res.status(200).json({
+        success: true,
+        message: `You are now following ${followUser.name}`,
+        data: { isFollowing: true },
+    });
+});
 
-}
+export const unfollowUser = asyncHandler(async (req, res) => {
+    const { user, unfollowUser: target } = await unfollowUserService(
+        req.user._id,
+        req.params.unfollowUserId
+    );
 
-export const getUserPost=(req,res)=>{
-    try{
-        const userPost=req.user._id;
-        console.log("User Post fetched successfully:", userPost);
-    }
-    catch(err){
-        return res.status(500).json({message:$`post for ${req.user.name} not found`});
-    }
+    await removeNotification({ recipient: target._id, actor: user._id, type: 'follow' });
 
+    res.status(200).json({
+        success: true,
+        message: `You unfollowed ${target.name}`,
+        data: { isFollowing: false },
+    });
+});
 
-}
+export const isFollowing = asyncHandler(async (req, res) => {
+    const following = await isFollowingService(req.user._id, req.params.id);
+    res.status(200).json({ success: true, data: { isFollowing: following } });
+});
 
-export const updateUser=async(req,res)=>{
-    try{
-        const userId=req.params.id;
-        const updateData=req.body;
-        // Assuming you have a service function to update the user
-        const updatedUser=await updateUserService(userId, updateData);
-        if(!updatedUser){
-            return res.status(404).json({message:"user not found"})
-        }
-        res.status(200).json(updatedUser);
+export const deleteMe = asyncHandler(async (req, res) => {
+    await deleteUserService(req.user._id);
+    res.clearCookie('token');
+    res.clearCookie('refreshToken');
+    res.status(200).json({ success: true, message: 'Account deleted' });
+});
 
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
-    }
-}
+export const getAllUsers = asyncHandler(async (req, res) => {
+    const result = await getAllUsersService(req.validatedQuery);
+    res.status(200).json({ success: true, ...result });
+});
 
-
-export const followUser=async(req,res)=>{
-    try{
-        const userId=req.user._id; // Assuming user ID is stored in req.user
-        const followUserId=req.params.followUserId; // Assuming the user to follow is specified in the request parameters
-        const {user,followUser}=await followUserService(userId,followUserId);
-        if(!user || !followUser){
-            return res.status(404).json({message:"user not found"})
-        }
-        res.status(200).json({message:`${user.name} followed ${followUser.name}`});
-
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
-    }
-}
-
-
-export const unfollowUser=async(req,res)=>{
-    try{
-        const userId=req.user._id; // Assuming user ID is stored in req.user
-        const unfollowUserId=req.params.unfollowUserId; // Assuming the user to unfollow is specified in the request parameters
-        const {user,unfollowUser}=await unfollowUserService(userId,unfollowUserId);
-        if(!user || !unfollowUser){
-            return res.status(404).json({message:"user not found"})
-        }
-        res.status(200).json({message:`${user.name} unfollowed ${unfollowUser.name}`});
-
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
-    }
-}
-
-export const deleteUser=async(req,res)=>{
-    try{
-        const userId=req.user._id; // Assuming user ID is stored in req.user
-        // Assuming you have a service function to delete the user
-        const deletedUser=await deleteUserService(userId);
-        if(!deletedUser){
-            return res.status(404).json({message:"user not found"})
-        }
-        res.status(200).json({message:"user deleted successfully"});
-
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
-    }
-}
-
-export const getAllUsers = async (req, res) => {
-    try{
-
-        const users=await getAllUsersService(); // Assuming you have a service function to get all users
-        if(!users || users.length === 0){
-            return res.status(404).json({message:"No users found"})
-        }
-        res.status(200).json(users);
-
-    }
-    catch(err){
-        return res.status(500).json({message:err.message});
-    }
-}
+export const searchUsers = asyncHandler(async (req, res) => {
+    const { q, ...pagination } = req.validatedQuery;
+    const result = await searchUsersService(q, pagination, req.user._id);
+    res.status(200).json({ success: true, ...result });
+});

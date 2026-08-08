@@ -1,112 +1,168 @@
+import mongoose from "mongoose";
+import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
+import Notification from "../models/notification.model.js";
+import Conversation from "../models/conversation.model.js";
+import Message from "../models/message.model.js";
+import { badRequest, notFound } from "../utils/AppError.js";
+import { escapeRegex } from "../utils/sanitize.js";
+
+const PUBLIC_FIELDS = "name pic bio followers following isAccountVerified createdAt";
 
 export const getUserService = async (userId) => {
-    try {
+    // Explicit field list: the previous `User.findById(userId)` with no
+    // projection returned the bcrypt password hash and every OTP field to any
+    // caller who knew a user id.
+    const user = await User.findById(userId).select(PUBLIC_FIELDS);
+    if (!user) throw notFound("User not found");
+    return user;
+};
 
-        // console.log("Fetching user with ID:", userId);
+/** Profile view for another user, including whether the viewer follows them. */
+export const getPublicProfileService = async (targetId, viewerId) => {
+    const user = await User.findById(targetId).select(PUBLIC_FIELDS).lean();
+    if (!user) throw notFound("User not found");
 
-        const user = await User.findById(userId);
-        if (!user) {
-            throw new Error("User not found");
-        }
-        return user;
-    }
-    catch (error) {
-        throw new Error("Error fetching user: " + error.message);
-    }
-}
+    const postCount = await Post.countDocuments({ author: targetId });
 
+    return {
+        ...user,
+        followerCount: user.followers?.length ?? 0,
+        followingCount: user.following?.length ?? 0,
+        postCount,
+        isFollowing:
+            viewerId != null &&
+            (user.followers ?? []).some((id) => id.toString() === viewerId.toString()),
+        isSelf: viewerId != null && targetId.toString() === viewerId.toString(),
+    };
+};
 
+/**
+ * Update the *caller's own* profile.
+ *
+ * The old signature was `updateUserService(req.params.id, req.body)`, so the
+ * target came from the URL and the payload was unfiltered — any logged-in user
+ * could rewrite another account's password, follower list, or verified flag.
+ * The id now always comes from the session, and the schema whitelists fields.
+ */
 export const updateUserService = async (userId, data) => {
-    try {
-        // Find the user by ID and update with the provided data
-        const updatedUser = await User.findByIdAndUpdate(userId, data, { new: true, runValidators: true });
-        if (!updatedUser) {
-            throw new Error('User not found');
-        }
-        // Return the updated user object
-        return updatedUser;
-    } catch (error) {
-        // Handle errors, such as user not found or validation errors
-        throw new Error('Error updating user: ' + error.message);
-    }
-}
-
+    const user = await User.findByIdAndUpdate(userId, data, {
+        new: true,
+        runValidators: true,
+    }).select(PUBLIC_FIELDS);
+    if (!user) throw notFound("User not found");
+    return user;
+};
 
 export const followUserService = async (userId, followUserId) => {
-    try {
-        // console.log("User ID:", userId);
-        // console.log("Follow User ID:", followUserId);   
-        const user = await User.findById(userId);
-        const followUser = await User.findById(followUserId);
-        if (!user || !followUser) {
-            throw new Error('User or follow user not found');
-        }
-        // console.log(user._id, followUser._id);
-
-        if (!followUser.followers.some(id => id.toString() === user._id.toString())) {
-            followUser.followers.push(user._id);
-        }
-
-        if (!user.following.some(id => id.toString() === followUser._id.toString())) {
-            console.log('Pushing followUser._id to user.following:', followUser._id.toString());
-
-            user.following.push(followUser._id);
-        }
-        await followUser.save();
-        await user.save();
-        return { user, followUser };
+    if (userId.toString() === followUserId.toString()) {
+        throw badRequest("You cannot follow yourself");
     }
-    catch (error) {
-        throw new Error('Error following user: ' + error.message);
-    }
-}
 
+    const [user, followUser] = await Promise.all([
+        User.findById(userId),
+        User.findById(followUserId),
+    ]);
+    if (!user || !followUser) throw notFound("User not found");
+
+    // $addToSet makes the write idempotent, so a double-click cannot push the
+    // same id twice and inflate the follower count.
+    await Promise.all([
+        User.updateOne({ _id: followUserId }, { $addToSet: { followers: user._id } }),
+        User.updateOne({ _id: userId }, { $addToSet: { following: followUser._id } }),
+    ]);
+
+    return { user, followUser };
+};
 
 export const unfollowUserService = async (userId, unfollowUserId) => {
-    try{
-        const user=await User.findById(userId);
-        const unfollowUser=await User.findById(unfollowUserId);
-        if(!user || !unfollowUser){
-            throw new Error('User or unfollow user not found');
-        }
-        // Remove the unfollowUser from user's following list
-        user.following = user.following.filter(id => id.toString() !== unfollowUser._id.toString());
-        // Remove the user from unfollowUser's followers list
-        unfollowUser.followers = unfollowUser.followers.filter(id => id.toString() !== user._id.toString());
-        await user.save();
-        await unfollowUser.save();
-        return { user, unfollowUser };
+    if (userId.toString() === unfollowUserId.toString()) {
+        throw badRequest("You cannot unfollow yourself");
     }
-    catch (error) {
-        throw new Error('Error unfollowing user: ' + error.message);
-    }
-}
 
+    const [user, unfollowUser] = await Promise.all([
+        User.findById(userId),
+        User.findById(unfollowUserId),
+    ]);
+    if (!user || !unfollowUser) throw notFound("User not found");
 
+    await Promise.all([
+        User.updateOne({ _id: unfollowUserId }, { $pull: { followers: user._id } }),
+        User.updateOne({ _id: userId }, { $pull: { following: unfollowUser._id } }),
+    ]);
+
+    return { user, unfollowUser };
+};
+
+export const isFollowingService = async (userId, targetId) => {
+    const user = await User.findById(userId).select("following");
+    if (!user) throw notFound("User not found");
+    return user.following.some((id) => id.toString() === targetId.toString());
+};
+
+/**
+ * Delete the caller's account and everything that pointed at it.
+ *
+ * The previous version deleted only the User document, leaving orphaned posts,
+ * comments, messages and follow references behind that then rendered as
+ * "Unknown" throughout the UI.
+ */
 export const deleteUserService = async (userId) => {
-    try{
-        const deletedUser = await User.findByIdAndDelete(userId);
-        if (!deletedUser) {
-            throw new Error('User not found');
-        }
-        return deletedUser;
-    }
-    catch (error) {
-        throw new Error('Error deleting user: ' + error.message);
-    }
-}
+    const user = await User.findById(userId);
+    if (!user) throw notFound("User not found");
 
-export const getAllUsersService = async () => {
-    try {
-        const users = await User.find({});
-        if (!users || users.length === 0) {
-            throw new Error('No users found');
-        }
-        return users;
-    } catch (error) {
-        throw new Error('Error fetching all users: ' + error.message);
-    }
-}
+    const id = new mongoose.Types.ObjectId(userId);
 
+    await Promise.all([
+        Post.deleteMany({ author: id }),
+        Post.updateMany({ likes: id }, { $pull: { likes: id } }),
+        Post.updateMany({ "comments.author": id }, { $pull: { comments: { author: id } } }),
+        User.updateMany({ followers: id }, { $pull: { followers: id } }),
+        User.updateMany({ following: id }, { $pull: { following: id } }),
+        Notification.deleteMany({ $or: [{ recipient: id }, { actor: id }] }),
+        Message.deleteMany({ $or: [{ senderId: id }, { receiverId: id }] }),
+        Conversation.deleteMany({ participants: id }),
+    ]);
 
+    await user.deleteOne();
+    return user;
+};
+
+export const getAllUsersService = async ({ page, limit }) => {
+    const [items, total] = await Promise.all([
+        User.find()
+            .select(PUBLIC_FIELDS)
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+        User.countDocuments(),
+    ]);
+
+    return {
+        items,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    };
+};
+
+export const searchUsersService = async (query, { page, limit }, excludeId) => {
+    const term = escapeRegex(query);
+    const filter = {
+        $or: [{ name: { $regex: term, $options: "i" } }, { email: { $regex: term, $options: "i" } }],
+        ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+    };
+
+    const [items, total] = await Promise.all([
+        User.find(filter)
+            .select(PUBLIC_FIELDS)
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+        User.countDocuments(filter),
+    ]);
+
+    return {
+        items,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    };
+};
