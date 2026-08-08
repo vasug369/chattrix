@@ -1,20 +1,37 @@
 import mongoose from "mongoose";
-import dotenv from 'dotenv';
-dotenv.config();
-const mongoUri=mongoose.connect(`mongodb+srv://${process.env.DB_Host}:${process.env.DB_Pass}@cluster0.ffirymn.mongodb.net/${process.env.DB_Name}?retryWrites=true&w=majority&appName=Cluster0`);
+import env from "./env.js";
 
-const connectDB=async()=>{
-    await mongoUri
-.then(()=>{
-    console.log("mongodb is connected");
-    // console.log("mongo uri is",mongoUri);
-    
+/**
+ * Connect to Mongo.
+ *
+ * The previous version called mongoose.connect() at module scope, so merely
+ * importing this file opened a connection — which is why tests could not point
+ * the app at a throwaway database. The connection now happens only when
+ * connectDB() is called, and the URI is injectable.
+ */
+export const connectDB = async (uri = env.mongoUri) => {
+    if (!uri) {
+        throw new Error(
+            'No MongoDB connection string. Set MONGO_URI, or DB_Host/DB_Pass/DB_Name.'
+        );
+    }
 
-})
-.catch((err)=>{
-    console.log(err);
-})
+    mongoose.set('strictQuery', true);
 
-}
+    try {
+        await mongoose.connect(uri, {
+            serverSelectionTimeoutMS: 10000,
+        });
+        if (!env.isTest) console.log('MongoDB connected');
+        return mongoose.connection;
+    } catch (err) {
+        console.error('MongoDB connection failed:', err.message);
+        throw err;
+    }
+};
+
+export const disconnectDB = async () => {
+    await mongoose.disconnect();
+};
 
 export default connectDB;

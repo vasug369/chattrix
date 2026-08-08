@@ -1,78 +1,104 @@
 import Conversation from '../models/conversation.model.js';
 import Message from '../models/message.model.js';
 import User from '../models/user.model.js';
-import { getReceiverSocketId, io } from '../server.js';
+// Imported from the realtime module rather than server.js — importing the
+// server pulled in a listen() call and a DB connection as a side effect.
+import { emitToUser } from '../realtime/socket.js';
+import { notify } from '../services/notificationService.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { badRequest, notFound } from '../utils/AppError.js';
 
-export const sendMessage = async (req, res) => {
-    try {
-        const { message } = req.body;
-        const { id: receiverId } = req.params;
-        const senderId = req.user._id;
+export const sendMessage = asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    const { id: receiverId } = req.params;
+    const senderId = req.user._id;
 
-        let conversation = await Conversation.findOne({
-            participants: { $all: [senderId, receiverId] }
-        });
+    if (receiverId === senderId.toString()) throw badRequest('You cannot message yourself');
 
-        if (!conversation) {
-            conversation = await Conversation.create({
-                participants: [senderId, receiverId]
-            });
-        }
+    // The previous handler never checked the recipient existed, so a bogus id
+    // created a dangling conversation that no one could ever open.
+    const receiver = await User.findById(receiverId).select('_id name');
+    if (!receiver) throw notFound('Recipient not found');
 
-        const newMessage = new Message({
-            senderId,
-            receiverId,
-            message
-        });
-
-        if (newMessage) {
-            conversation.messages.push(newMessage._id);
-        }
-
-        await Promise.all([conversation.save(), newMessage.save()]);
-
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if (receiverSocketId) {
-            // Emit to the specific receiver
-            io.to(receiverSocketId).emit("newMessage", newMessage);
-        }
-
-        res.status(201).json(newMessage);
-    } catch (error) {
-        console.log("Error in sendMessage controller: ", error.message);
-        res.status(500).json({ error: "Internal server error" });
+    let conversation = await Conversation.findOne({
+        participants: { $all: [senderId, receiverId], $size: 2 },
+    });
+    if (!conversation) {
+        conversation = await Conversation.create({ participants: [senderId, receiverId] });
     }
-};
 
-export const getMessages = async (req, res) => {
-    try {
-        const { id: userToChatId } = req.params;
-        const senderId = req.user._id;
+    const newMessage = await Message.create({ senderId, receiverId, message });
+    conversation.messages.push(newMessage._id);
+    await conversation.save();
 
-        const conversation = await Conversation.findOne({
-            participants: { $all: [senderId, userToChatId] }
-        }).populate("messages");
+    emitToUser(receiverId, 'newMessage', newMessage.toJSON());
 
-        if (!conversation) return res.status(200).json([]);
+    await notify({
+        recipient: receiverId,
+        actor: senderId,
+        type: 'message',
+        preview: message.slice(0, 140),
+    });
 
-        const messages = conversation.messages;
-        res.status(200).json(messages);
-    } catch (error) {
-        console.log("Error in getMessages controller: ", error.message);
-        res.status(500).json({ error: "Internal server error" });
+    res.status(201).json({ success: true, data: newMessage });
+});
+
+export const getMessages = asyncHandler(async (req, res) => {
+    const { id: userToChatId } = req.params;
+    const myId = req.user._id;
+    const { page, limit } = req.validatedQuery;
+
+    const filter = {
+        $or: [
+            { senderId: myId, receiverId: userToChatId },
+            { senderId: userToChatId, receiverId: myId },
+        ],
+    };
+
+    // Query Message directly instead of populating the conversation's id array:
+    // that array grows unboundedly and was loaded in full on every open.
+    const [messages, total] = await Promise.all([
+        Message.find(filter)
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+        Message.countDocuments(filter),
+    ]);
+
+    // Opening a thread marks the other side's messages as read.
+    const unread = await Message.updateMany(
+        { senderId: userToChatId, receiverId: myId, readAt: null },
+        { $set: { readAt: new Date() } }
+    );
+    if (unread.modifiedCount > 0) {
+        emitToUser(userToChatId, 'messagesRead', { by: myId.toString() });
     }
-};
 
-export const getUsersForSidebar = async (req, res) => {
-    try {
-        const loggedInUserId = req.user._id;
+    res.status(200).json({
+        success: true,
+        items: messages.reverse(), // oldest-first for rendering
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    });
+});
 
-        // Find all users except the currently logged in user
-        const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+export const getUsersForSidebar = asyncHandler(async (req, res) => {
+    const myId = req.user._id;
 
-        res.status(200).json(filteredUsers);
-    } catch (error) {
-        console.log("Error in getUsersForSidebar controller: ", error.message);
-        res.status(500).json({ error: "Internal server error" });
-    }
-};
+    const users = await User.find({ _id: { $ne: myId } })
+        .select('name pic bio')
+        .lean();
+
+    // Per-conversation unread counts, in one aggregate rather than one query
+    // per user.
+    const unreadCounts = await Message.aggregate([
+        { $match: { receiverId: myId, readAt: null } },
+        { $group: { _id: '$senderId', count: { $sum: 1 } } },
+    ]);
+    const unreadBySender = new Map(unreadCounts.map((r) => [r._id.toString(), r.count]));
+
+    res.status(200).json({
+        success: true,
+        items: users.map((u) => ({ ...u, unreadCount: unreadBySender.get(u._id.toString()) ?? 0 })),
+    });
+});

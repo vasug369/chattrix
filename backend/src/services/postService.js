@@ -1,173 +1,136 @@
 import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
-const createPost = async (data) => {
-    try {
-        const post = new Post(data);
-        return await post.save();
-    } catch (error) {
-        throw new Error('Error creating post: ' + error.message);
-    }
+import { forbidden, notFound } from "../utils/AppError.js";
+import { escapeRegex } from "../utils/sanitize.js";
+
+const AUTHOR_FIELDS = "name pic";
+
+/** Consistent shape for every paginated list the API returns. */
+const paginate = async (query, { page, limit }, countFilter) => {
+    const [items, total] = await Promise.all([
+        query
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .populate("author", AUTHOR_FIELDS)
+            .lean(),
+        Post.countDocuments(countFilter),
+    ]);
+
+    return {
+        items,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+    };
 };
 
-const getPostById = async (postId) => {
-    try {
-        return await Post.findById(postId);
-    } catch (error) {
-        throw new Error('Error fetching post: ' + error.message);
-    }
+export const createPostService = (data) => Post.create(data);
+
+export const getPostByIdService = async (postId) => {
+    const post = await Post.findById(postId).populate("author", AUTHOR_FIELDS);
+    if (!post) throw notFound("Post not found");
+    return post;
 };
 
-const getAllPosts = async () => {
-    try {
+export const getPostsService = (pagination) =>
+    // An empty result is a legitimate empty feed, not an error. The previous
+    // implementation threw 'No posts found', which surfaced as a 500.
+    paginate(Post.find(), pagination, {});
 
-        const posts = await Post.find().populate('author', 'name');
-        if (!posts || posts.length === 0) {
-            throw new Error('No posts found');
-        }
-        console.log('Fetched posts:', posts); // Debugging line
-        // posts.forEach(post => {
-        //     console.log(`Post: ${post.title}`);
-        //     console.log(`Author: ${post.author?.name || 'Unknown'}`);
-        //     console.log(`Likes: ${post.likes.length}`);
-        //     console.log(`Comments: ${post.comments.length}`);
-        //     post.comments.forEach(comment => {
-        //         console.log(` - ${comment.author?.name || 'Unknown'}: ${comment.content}`);
-        //     });
-        // });
-
-
-        return posts;
-    } catch (error) {
-        throw new Error('Error fetching posts: ' + error.message);
+/**
+ * Load a post and assert the caller owns it.
+ *
+ * updatePost and deletePost previously took only an id, so any authenticated
+ * user could edit or delete any post in the database just by knowing its id.
+ */
+const assertOwnership = async (postId, userId) => {
+    const post = await Post.findById(postId);
+    if (!post) throw notFound("Post not found");
+    if (post.author.toString() !== userId.toString()) {
+        throw forbidden("You can only modify your own posts");
     }
+    return post;
 };
 
-const updatePost = async (postId, data) => {
-    try {
-        return await Post.findByIdAndUpdate(postId, data, { new: true });
-    } catch (error) {
-        throw new Error('Error updating post: ' + error.message);
-    }
+export const updatePostService = async (postId, userId, data) => {
+    const post = await assertOwnership(postId, userId);
+    Object.assign(post, data, { updatedAt: new Date() });
+    await post.save();
+    return post.populate("author", AUTHOR_FIELDS);
 };
 
-const deletePost = async (postId) => {
-    try {
-        return await Post.findByIdAndDelete(postId);
-    } catch (error) {
-        throw new Error('Error deleting post: ' + error.message);
-    }
+export const deletePostService = async (postId, userId) => {
+    const post = await assertOwnership(postId, userId);
+    await post.deleteOne();
+    return post;
 };
 
+export const getUserPostsService = (userId, pagination) =>
+    paginate(Post.find({ author: userId }), pagination, { author: userId });
 
-const getUserPosts = async (userId) => {
-    try {
-        const posts = await Post.find({ author: userId });
-        if (!posts) {
-            throw new Error("No posts found for this user");
-        }
-        return posts;
+export const commentPostService = async (postId, user, content) => {
+    const post = await Post.findById(postId);
+    if (!post) throw notFound("Post not found");
 
+    post.comments.push({
+        author: user._id,
+        content,
+        name: user.name,
+        createdAt: new Date(),
+    });
+    await post.save();
+
+    return {
+        post: await post.populate("author", AUTHOR_FIELDS),
+        comment: post.comments[post.comments.length - 1],
+    };
+};
+
+export const toggleLikeService = async (postId, userId) => {
+    const post = await Post.findById(postId);
+    if (!post) throw notFound("Post not found");
+
+    const id = userId.toString();
+    const alreadyLiked = post.likes.some((likeId) => likeId.toString() === id);
+
+    if (alreadyLiked) {
+        post.likes = post.likes.filter((likeId) => likeId.toString() !== id);
+    } else {
+        post.likes.push(userId);
     }
-    catch (error) {
-        throw new Error('Error fetching user posts: ' + error.message);
-    }
-}
+    await post.save();
 
-const commentPost = async (req, postId) => {
-    try {
-        const post = await Post.findById(postId);
-        const comment_username= await User.findById(req.user._id, 'name');
-        if (!comment_username) {
-            throw new Error('User not found');
-        }
-        if (!post) {
-            throw new Error('Post not found');
-        }
-        post.comments.push({
-            author: req.user._id,
-            content: req.body.content,
-            name: comment_username.name
-        })
-        await post.save();
-        return await Post.findById(postId).populate('author', 'name');
-    }
-    catch (err) {
-        throw new Error('error commenting on post: ' + err.message);
-    }
-}
+    return { post, liked: !alreadyLiked, likeCount: post.likes.length };
+};
 
+/**
+ * Posts from everyone the user follows, newest first.
+ *
+ * The previous version looped over `following` issuing one query per followed
+ * user and pushed each result *array* into an accumulator — so the endpoint
+ * returned an array of arrays in follow order, not a merged chronological
+ * feed, and did N round-trips. One `$in` query replaces it.
+ */
+export const feedPostsService = async (userId, pagination) => {
+    const user = await User.findById(userId).select("following");
+    if (!user) throw notFound("User not found");
 
-const feedPosts = async (userId) => {
-    // console.log(userId);
-    try {
-        const user = await User.findById(userId).populate('following','_id');
-        // user.forEach(element => {
-            // const posts=aw            throw new Error('Post not found');
+    // Include the user's own posts so a new account's feed isn't empty.
+    const authorIds = [...user.following, user._id];
+    const filter = { author: { $in: authorIds } };
 
-            //     throw new Error("No posts found for this user");
-            // }
-            // return posts;
+    return paginate(Post.find(filter), pagination, filter);
+};
 
-        // });
+export const searchPostsService = (searchQuery, pagination) => {
+    // Escaped: raw user input reaching $regex is both a ReDoS vector and a way
+    // to match every document with '.*'.
+    const term = escapeRegex(searchQuery);
+    const filter = {
+        $or: [
+            { title: { $regex: term, $options: "i" } },
+            { content: { $regex: term, $options: "i" } },
+        ],
+    };
 
-        let allPost=[];
-        for(const followedUser of user.following){
-            const posts=await Post.find({author:followedUser._id}).populate('author', 'name');
-            console.log(posts);
-            allPost.push(posts);
-        }
-
-
-        
-        return allPost;
-
-    }
-    catch (err) {
-        throw new Error('error fetching feed');
-    }
-}
-
-
-const searchPosts = async (searchQuery) => {
-    // console.log("ASdas");
-    // console.log('Search query:', req.query.q); // Debugging line
-    try {
-        const searchTerm = searchQuery;
-        if (!searchTerm) {
-            throw new Error('Post not found');
-        }
-
-
-        console.log("Searching for:", searchTerm);
-
-        
-        const posts = await Post.find({
-            $or: [
-                { title: { $regex: searchTerm, $options: 'i' } },
-                { content: { $regex: searchTerm, $options: 'i' } }
-            ]
-        }).populate('author', 'name');
-
-        
-        // console.log('Search results:', posts); // Debugging line
-        // if (posts.length === 0) {
-        //     throw new Error('Post not found');
-        // }
-        // console.log('Search query:', searchQuery); // Debugging line
-
-        return posts;
-    } catch (error) {
-        throw new Error('error searching post');
-    }
-}
-// Exporting the services for use in controllers    
-
-export const createPostService = createPost;
-export const getPostByIdService = getPostById;
-export const getPostsService = getAllPosts;
-export const updatePostService = updatePost;
-export const deletePostService = deletePost;
-export const getUserPostsService = getUserPosts;
-export const commentPostService = commentPost;
-export const feedPostsService = feedPosts;
-export const searchPostsService = searchPosts;
+    return paginate(Post.find(filter), pagination, filter);
+};

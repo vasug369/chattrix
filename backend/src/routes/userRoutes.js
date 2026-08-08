@@ -1,23 +1,39 @@
 import express from "express";
-import {deleteUser, followUser, getUser,unfollowUser,updateUser,getAllUsers} from '../controllers/userController.js';
+import {
+    deleteMe,
+    followUser,
+    getAllUsers,
+    getMe,
+    getUser,
+    isFollowing,
+    searchUsers,
+    unfollowUser,
+    updateMe,
+} from '../controllers/userController.js';
+import { writeLimiter } from '../middlewares/rateLimiters.js';
+import { validate } from '../middlewares/validate.js';
+import {
+    followParamSchema,
+    listUsersSchema,
+    searchUsersSchema,
+    unfollowParamSchema,
+    updateProfileSchema,
+    userIdParamSchema,
+} from '../validation/user.schema.js';
+
 const userRouter = express.Router();
 
-userRouter.get('/getAllUsers',getAllUsers);
-userRouter.get('/me',(req, res) => {
-    res.status(200).json({
-        id: req.user._id,
-        email: req.user.email,
-        name: req.user.name,
-        // ...anything else you want
-    });
-});
-userRouter.get('/:id',getUser);
+// Literal segments first so they aren't swallowed by '/:id'.
+userRouter.get('/getAllUsers', validate(listUsersSchema), getAllUsers);
+userRouter.get('/search', validate(searchUsersSchema), searchUsers);
+userRouter.get('/me', getMe);
+userRouter.patch('/me', writeLimiter, validate(updateProfileSchema), updateMe);
+userRouter.delete('/me', writeLimiter, deleteMe);
 
-userRouter.put('/:followUserId/follow',followUser); // Assuming you want to follow a user, you can implement the logic in the controller
-userRouter.put('/:unfollowUserId/unfollow',unfollowUser); // Assuming you want to follow a user, you can implement the logic in the controller
-userRouter.put('/:id',updateUser); // Assuming you want to update user details, you can implement the logic in the controller
-userRouter.delete('/', deleteUser); // Assuming you want to delete a user, you can implement the logic in the controller
-    
+userRouter.get('/is-following/:id', validate(userIdParamSchema), isFollowing);
+userRouter.get('/:id', validate(userIdParamSchema), getUser);
 
+userRouter.put('/:followUserId/follow', writeLimiter, validate(followParamSchema), followUser);
+userRouter.put('/:unfollowUserId/unfollow', writeLimiter, validate(unfollowParamSchema), unfollowUser);
 
 export default userRouter;

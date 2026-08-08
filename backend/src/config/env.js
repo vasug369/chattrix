@@ -1,0 +1,96 @@
+import dotenv from 'dotenv';
+import { z } from 'zod';
+
+dotenv.config();
+
+const isTest = process.env.NODE_ENV === 'test';
+
+/**
+ * Every secret the app needs, validated once at boot.
+ *
+ * Missing/short secrets used to fail lazily and confusingly — a missing
+ * JWT_REFRESH_SECRET surfaced as a generic 500 from /api/auth/login, because
+ * jwt.sign() throws when the secret is undefined. Failing here instead makes
+ * misconfiguration obvious before the server accepts a single request.
+ */
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+
+  // Mongo: either a full URI, or the DB_* triple the project already used.
+  MONGO_URI: z.string().optional(),
+  DB_Host: z.string().optional(),
+  DB_Pass: z.string().optional(),
+  DB_Name: z.string().optional(),
+
+  JWT_SECRET: isTest
+    ? z.string().default('test-access-secret-not-used-in-production')
+    : z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_REFRESH_SECRET: isTest
+    ? z.string().default('test-refresh-secret-not-used-in-production')
+    : z.string().min(16, 'JWT_REFRESH_SECRET must be at least 16 characters'),
+
+  ACCESS_TOKEN_TTL: z.string().default('15m'),
+  REFRESH_TOKEN_TTL: z.string().default('7d'),
+
+  CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:5173,https://chattrix-nmlf.vercel.app'),
+
+  // Mail — optional so local dev and tests run without SMTP credentials.
+  SMTP_HOST: z.string().default('sandbox.smtp.mailtrap.io'),
+  SMTP_PORT: z.coerce.number().int().positive().default(2525),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SENDER_EMAIL: z.string().default('no-reply@chattrix.app'),
+
+  // Cloudinary — optional; uploads degrade gracefully when unset.
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+
+  OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
+  OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+
+  // bcrypt work factor. Deliberately low under test — cost 10 makes each
+  // register+login round-trip ~300ms, which dominated the suite runtime.
+  BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(isTest ? 4 : 10),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const details = parsed.error.issues
+    .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
+    .join('\n');
+  throw new Error(`Invalid environment configuration:\n${details}`);
+}
+
+const raw = parsed.data;
+
+const mongoUri =
+  raw.MONGO_URI ||
+  (raw.DB_Host && raw.DB_Pass
+    ? `mongodb+srv://${raw.DB_Host}:${raw.DB_Pass}@cluster0.ffirymn.mongodb.net/${
+        raw.DB_Name ?? 'chattrix'
+      }?retryWrites=true&w=majority&appName=Cluster0`
+    : undefined);
+
+export const env = {
+  ...raw,
+  mongoUri,
+  isProduction: raw.NODE_ENV === 'production',
+  isTest: raw.NODE_ENV === 'test',
+  corsOrigins: raw.CORS_ORIGINS.split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+  // Never send real mail from a test run. dotenv loads the developer's .env
+  // even under NODE_ENV=test, so without this guard every registration in the
+  // suite opened a live SMTP connection (~7s per call) and spammed the inbox.
+  mailEnabled: Boolean(raw.SMTP_USER && raw.SMTP_PASS) && !isTest,
+  cloudinaryEnabled: Boolean(
+    raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET
+  ),
+};
+
+export default env;

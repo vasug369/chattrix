@@ -1,165 +1,560 @@
-/* ===== Chattrix Design System ===== */
+@import "tailwindcss";
+
+/* ------------------------------------------------------------
+   Everything below is wrapped in @layer base / components.
+
+   This is load-bearing, not tidiness: Tailwind v4 emits its
+   utilities inside `@layer utilities`, and in the CSS cascade
+   *unlayered* rules beat every layered rule regardless of
+   specificity. An unlayered `* { padding: 0 }` reset therefore
+   silently defeats `p-8`, `mb-4`, `gap-3` and every other
+   spacing utility in the app.
+
+   Rules of thumb:
+     @layer base       — reset, tokens, element defaults
+     @layer components — .glass, .gl-btn, .gl-input, animations
+   so that Tailwind utilities always win over both.
+   ------------------------------------------------------------ */
+
+@layer base {
+
+/* ============================================================
+   Chattrix Design System — "Aurora Glass"
+   ------------------------------------------------------------
+   Glassmorphism built from three stacked layers:
+
+     1. Canvas  — a deep, slightly violet base colour
+     2. Aurora  — large, soft, slow-drifting colour blobs
+     3. Glass   — frosted panels that refract the aurora behind them
+
+   Glass only reads as glass when there is something colourful and
+   uneven behind it. That is why the aurora layer exists, and why
+   panels use translucent gradient fills rather than flat greys.
+   ============================================================ */
 
 :root {
-  /* Colors */
-  --bg-primary: #0a0a1b;
-  --bg-secondary: #13132e;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-hover: rgba(255, 255, 255, 0.08);
-  --bg-input: rgba(255, 255, 255, 0.07);
-  --bg-input-focus: rgba(255, 255, 255, 0.12);
+  /* ---- Canvas ---- */
+  --canvas: #070511;
+  --canvas-2: #0d0a20;
 
-  --accent-primary: #7c3aed;
-  --accent-secondary: #3b82f6;
-  --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-  --accent-glow: rgba(124, 58, 237, 0.4);
+  /* ---- Aurora blob colours ---- */
+  --aurora-violet: #7c3aed;
+  --aurora-blue: #3b82f6;
+  --aurora-cyan: #06b6d4;
+  --aurora-fuchsia: #d946ef;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  /* ---- Glass ----
+     Two fills: a top highlight and a body tint. The gradient between
+     them is what reads as a curved, lit surface instead of a flat
+     translucent rectangle. */
+  --glass-fill-top: rgba(255, 255, 255, 0.11);
+  --glass-fill-bottom: rgba(255, 255, 255, 0.04);
+  /* Used by .glass-panel for dropdowns and sidebars, which sit directly over
+     body text rather than over the aurora.
+     This has to be near-opaque. Blur does not hide high-contrast white text:
+     at 0.55 the feed was plainly readable through the notification panel, and
+     even at 0.88 the residual 12% was legible. The panel still reads as glass
+     via its blur, border and specular edge. */
+  --glass-fill-solid: rgba(14, 11, 32, 0.97);
 
-  --border-color: rgba(255, 255, 255, 0.12);
-  --border-glow: rgba(124, 58, 237, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-strong: rgba(255, 255, 255, 0.22);
 
-  --danger: #ef4444;
-  --success: #22c55e;
+  /* Specular edge: a bright inset line along the top of a panel,
+     imitating light catching a bevelled glass edge. */
+  --glass-specular: rgba(255, 255, 255, 0.35);
 
-  /* Typography */
-  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  --glass-blur: 20px;
+  --glass-blur-strong: 40px;
+
+  /* ---- Accents ---- */
+  --accent: #8b5cf6;
+  --accent-2: #3b82f6;
+  --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%);
+  --accent-gradient-warm: linear-gradient(135deg, #d946ef 0%, #8b5cf6 100%);
+  --accent-glow: rgba(139, 92, 246, 0.45);
+
+  /* ---- Text ---- */
+  --text: #f8fafc;
+  --text-dim: #a5b4cf;
+  --text-muted: #6b7a99;
+
+  /* ---- Status ---- */
+  --danger: #f43f5e;
+  --success: #10b981;
+  --warning: #f59e0b;
+
+  /* ---- Shadows ---- */
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-lifted: 0 20px 60px rgba(0, 0, 0, 0.55);
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  font-family: "Poppins", system-ui, -apple-system, sans-serif;
   line-height: 1.6;
-  font-weight: 400;
-  color: var(--text-primary);
+  color: var(--text);
 
-  /* Rendering */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html,
 body {
-  background-color: var(--bg-primary);
-  min-height: 100vh;
+  min-height: 100%;
+}
+
+body {
+  background: var(--canvas);
   overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+  isolation: isolate;
 }
 
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--accent-primary);
-  border-radius: 3px;
+} /* end @layer base */
+
+@layer components {
+
+/* ============================================================
+   1. AURORA BACKGROUND
+   Fixed, behind everything, non-interactive. Rendered once in the app
+   shell rather than per page, so it never re-mounts and the blobs keep
+   drifting continuously across navigation.
+   ============================================================ */
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, #1a1040 0%, transparent 60%),
+    linear-gradient(180deg, var(--canvas) 0%, var(--canvas-2) 50%, var(--canvas) 100%);
 }
 
-/* ===== Glass Card ===== */
+.aurora__blob {
+  position: absolute;
+  border-radius: 50%;
+  /* The heavy blur is the whole point: it turns a hard circle into a
+     diffuse field of colour for the glass above to refract. */
+  filter: blur(80px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.aurora__blob--1 {
+  width: 45vw;
+  height: 45vw;
+  min-width: 380px;
+  min-height: 380px;
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle, var(--aurora-violet) 0%, transparent 70%);
+  animation: drift-1 24s var(--ease-out) infinite alternate;
+}
+
+.aurora__blob--2 {
+  width: 38vw;
+  height: 38vw;
+  min-width: 320px;
+  min-height: 320px;
+  bottom: -14%;
+  right: -6%;
+  background: radial-gradient(circle, var(--aurora-blue) 0%, transparent 70%);
+  animation: drift-2 30s var(--ease-out) infinite alternate;
+}
+
+.aurora__blob--3 {
+  width: 30vw;
+  height: 30vw;
+  min-width: 260px;
+  min-height: 260px;
+  top: 35%;
+  right: 18%;
+  background: radial-gradient(circle, var(--aurora-fuchsia) 0%, transparent 70%);
+  opacity: 0.3;
+  animation: drift-3 26s var(--ease-out) infinite alternate;
+}
+
+.aurora__blob--4 {
+  width: 26vw;
+  height: 26vw;
+  min-width: 220px;
+  min-height: 220px;
+  bottom: 18%;
+  left: 12%;
+  background: radial-gradient(circle, var(--aurora-cyan) 0%, transparent 70%);
+  opacity: 0.25;
+  animation: drift-4 34s var(--ease-out) infinite alternate;
+}
+
+@keyframes drift-1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(12vw, 8vh, 0) scale(1.15); }
+}
+@keyframes drift-2 {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-14vw, -10vh, 0) scale(1); }
+}
+@keyframes drift-3 {
+  from { transform: translate3d(0, 0, 0) scale(0.9); }
+  to   { transform: translate3d(-10vw, 12vh, 0) scale(1.2); }
+}
+@keyframes drift-4 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(10vw, -8vh, 0) scale(1.1); }
+}
+
+/* Faint film grain over the aurora. Pure gradients band visibly across
+   wide dark areas; noise dithers those bands away. */
+.aurora__noise {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   2. GLASS SURFACES
+   ============================================================ */
+
+.glass,
+.glass-strong,
+.glass-panel {
+  position: relative;
+  background-image: linear-gradient(
+    160deg,
+    var(--glass-fill-top) 0%,
+    var(--glass-fill-bottom) 100%
+  );
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+
 .glass {
-  background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-color);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   border-radius: 16px;
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  border-radius: 24px;
+  border-color: var(--glass-border-strong);
+}
+
+/* Less translucent variant for panels over busy content (sidebars,
+   dropdowns) where full transparency would hurt legibility. */
+.glass-panel {
+  background-color: var(--glass-fill-solid);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(160%);
   border-radius: 20px;
 }
 
-/* ===== Animations ===== */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* The specular edge — a 1px bright line fading out along the top.
+   This single detail is what most sells "pane of glass". */
+.glass::before,
+.glass-strong::before,
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-specular), transparent);
+  pointer-events: none;
 }
 
+/* Interactive lift for clickable glass. */
+.glass-hover {
+  transition:
+    transform 0.4s var(--ease-out),
+    border-color 0.4s var(--ease-out),
+    box-shadow 0.4s var(--ease-out);
+}
+.glass-hover:hover {
+  transform: translateY(-3px);
+  border-color: var(--glass-border-strong);
+  box-shadow: var(--shadow-lifted), 0 0 40px -12px var(--accent-glow);
+}
+
+/* Glowing ring for the active/featured state. */
+.glass-ring {
+  box-shadow:
+    var(--shadow-glass),
+    0 0 0 1px rgba(139, 92, 246, 0.4),
+    0 0 30px -8px var(--accent-glow);
+}
+
+/* ============================================================
+   3. CONTROLS
+   ============================================================ */
+
+.gl-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.3s var(--ease-out);
+}
+.gl-input::placeholder {
+  color: var(--text-muted);
+}
+.gl-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 0 24px -6px var(--accent-glow);
+}
+.gl-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.gl-input[aria-invalid="true"] {
+  border-color: rgba(244, 63, 94, 0.65);
+}
+.gl-input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.15);
+}
+
+.gl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: var(--accent-gradient);
+  background-size: 200% 200%;
+  transition:
+    transform 0.3s var(--ease-spring),
+    box-shadow 0.3s var(--ease-out),
+    background-position 0.6s var(--ease-out);
+}
+.gl-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background-position: 100% 50%;
+  box-shadow: 0 10px 30px -8px var(--accent-glow);
+}
+.gl-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.gl-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gl-btn--ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-dim);
+}
+.gl-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--glass-border-strong);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.gl-btn--danger {
+  background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);
+}
+
+.gl-btn--sm {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8rem;
+  border-radius: 10px;
+}
+
+/* Focus ring for keyboard users only — a visible ring on every mouse
+   click is noise, but removing it entirely strands keyboard users. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.8);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   4. TYPOGRAPHY HELPERS
+   ============================================================ */
+
+.gl-gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.gl-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================================
+   5. SCROLLBAR
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.35);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.35) transparent;
+}
+
+/* ============================================================
+   6. ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 20px var(--accent-glow);
-  }
-  50% {
-    box-shadow: 0 0 40px var(--accent-glow), 0 0 60px rgba(59, 130, 246, 0.2);
-  }
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
 }
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 @keyframes floatUp {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-100px) scale(1.5);
-  }
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-110px) scale(1.6); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 20px -6px var(--accent-glow); }
+  50%      { box-shadow: 0 0 44px -6px var(--accent-glow); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
-}
+.animate-fade-in-up { animation: fadeInUp 0.55s var(--ease-out) both; }
+.animate-fade-in    { animation: fadeIn 0.4s var(--ease-out) both; }
+.animate-slide-in   { animation: slideInLeft 0.45s var(--ease-out) both; }
+.animate-scale-in   { animation: scaleIn 0.3s var(--ease-spring) both; }
+.animate-pulse-glow { animation: pulseGlow 3.5s ease-in-out infinite; }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-.animate-slide-in {
-  animation: slideIn 0.5s ease-out forwards;
-}
-
-/* ===== Utility for staggered child animations ===== */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 80ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 160ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 240ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 320ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
 
-/* ===== Flying heart animation (dashboard) ===== */
+/* Loading skeleton — a shimmer sweeping across a glass block. */
+.gl-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 10px;
+}
+
+.gl-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 .flying-heart {
   position: fixed;
-  font-size: 24px;
-  animation: floatUp 1s ease-out forwards;
+  font-size: 26px;
+  animation: floatUp 1s var(--ease-out) forwards;
   pointer-events: none;
   z-index: 9999;
 }
+
+/* ============================================================
+   7. ACCESSIBILITY & COMPATIBILITY FALLBACKS
+   ============================================================ */
+
+/* The drifting blobs are decorative. Anyone who has asked the OS to
+   reduce motion gets a static background instead. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .aurora__blob {
+    animation: none !important;
+  }
+}
+
+/* backdrop-filter is widely but not universally supported. Without this
+   fallback, unsupported browsers render panels as near-invisible
+   rectangles with unreadable text floating over the aurora. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong,
+  .glass-panel {
+    background-color: rgba(17, 14, 38, 0.92);
+  }
+}
+
+} /* end @layer components */

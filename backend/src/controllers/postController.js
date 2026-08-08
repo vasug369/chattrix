@@ -1,182 +1,118 @@
 import {
+    commentPostService,
     createPostService,
+    deletePostService,
+    feedPostsService,
     getPostByIdService,
     getPostsService,
-    updatePostService,
-    deletePostService,
     getUserPostsService,
-    commentPostService,
-    feedPostsService,
-    searchPostsService
+    searchPostsService,
+    toggleLikeService,
+    updatePostService,
 } from '../services/postService.js';
+import { notify, removeNotification } from '../services/notificationService.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { badRequest } from '../utils/AppError.js';
+import { cloudinaryEnabled } from '../config/cloudinaryConfig.js';
 
-export const createPost = async (req, res) => {
-    try {
-        const userId = req.user._id; // Assuming user ID is stored in req.user
-        req.body.author = userId; // Set the author field to the user's ID
-        
-        if (req.file) {
-            req.body.pic = req.file.path; // Cloudinary secure URL
-        }
-        
-        const postData = req.body;
-        const newPost = await createPostService(postData);
-        res.status(201).json(newPost);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+export const createPost = asyncHandler(async (req, res) => {
+    // `author` comes from the session, never the body — validation strips any
+    // client-supplied author so a caller cannot post as somebody else.
+    const postData = { ...req.body, author: req.user._id };
 
-export const getPosts = async (req, res) => {
-    try {
-        const posts = await getPostsService();
-        res.status(200).json(posts);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-export const getPostById = async (req, res) => {
-    // console.log('req.params:', req.params); // 👈 Add this
-    try {
-        const postId = req.params.id;
-        const post = await getPostByIdService(postId);
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-        res.status(200).json(post);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-export const updatePost = async (req, res) => {
-    try {
-        const postId = req.params.id;
-        const updateData = req.body;
-        const updatedPost = await updatePostService(postId, updateData);
-        if (!updatedPost) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-        res.status(200).json(updatedPost);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-export const deletePost = async (req, res) => {
-    try {
-        const postId = req.params.id;
-        const deleted = await deletePostService(postId);
-        if (!deleted) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-        res.status(200).json({ message: 'Post deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-
-export const getUserPosts = async (req, res) => {
-    console.log('req.user:', req.user); // 👈 Add this
-
-    try {
-        const userId = req.user._id; // Assuming user ID is stored in req.user
-        const posts = await getUserPostsService(userId);
-        if (!posts) {
-            return res.status(404).json({ message: "No posts found for this user" });
-        }
-        return res.status(200).json(posts);
-
-    }
-    catch (error) {
-        return res.status(500).json({ message: error.message });
+    if (req.file) {
+        if (!cloudinaryEnabled) throw badRequest('Image uploads are not configured on this server');
+        postData.pic = req.file.path;
     }
 
-}
+    const newPost = await createPostService(postData);
+    const populated = await newPost.populate('author', 'name pic');
+    res.status(201).json({ success: true, data: populated });
+});
 
+export const getPosts = asyncHandler(async (req, res) => {
+    const result = await getPostsService(req.validatedQuery);
+    res.status(200).json({ success: true, ...result });
+});
 
-export const likePost = async (req, res) => {
-    try {
-        const postId = req.params.postId;
-        const userId = req.user._id; // Assuming user ID is stored in req.user
+export const getPostById = asyncHandler(async (req, res) => {
+    const post = await getPostByIdService(req.params.id);
+    res.status(200).json({ success: true, data: post });
+});
 
-        // Find the post by ID
-        const post = await getPostByIdService(postId);
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
+export const updatePost = asyncHandler(async (req, res) => {
+    const updated = await updatePostService(req.params.id, req.user._id, req.body);
+    res.status(200).json({ success: true, data: updated });
+});
 
-        // Check if the user has already liked the post
-        if (post.likes.includes(userId)) {
-            // If the user has already liked the post, remove their like (dislike)
-            post.likes = post.likes.filter(id => id.toString() !== userId.toString());
-            await post.save();
-            return res.status(200).json({ message: 'Post disliked successfully', post, likes: post.likes });
-        }
+export const deletePost = asyncHandler(async (req, res) => {
+    await deletePostService(req.params.id, req.user._id);
+    res.status(200).json({ success: true, message: 'Post deleted successfully' });
+});
 
-        // Add the user's ID to the likes array
-        post.likes.push(userId);
-        await post.save();
+export const getMyPosts = asyncHandler(async (req, res) => {
+    const result = await getUserPostsService(req.user._id, req.validatedQuery);
+    res.status(200).json({ success: true, ...result });
+});
 
-        res.status(200).json({ message: 'Post liked successfully', post, likes: post.likes });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+export const getUserPosts = asyncHandler(async (req, res) => {
+    const result = await getUserPostsService(req.params.userId, req.validatedQuery);
+    res.status(200).json({ success: true, ...result });
+});
+
+export const likePost = asyncHandler(async (req, res) => {
+    const { post, liked, likeCount } = await toggleLikeService(req.params.postId, req.user._id);
+
+    if (liked) {
+        await notify({
+            recipient: post.author,
+            actor: req.user._id,
+            type: 'like',
+            post: post._id,
+            preview: post.title,
+        });
+    } else {
+        // Withdraw the notification too, so an unliked post stops nagging.
+        await removeNotification({
+            recipient: post.author,
+            actor: req.user._id,
+            type: 'like',
+            post: post._id,
+        });
     }
-}
 
+    res.status(200).json({
+        success: true,
+        message: liked ? 'Post liked' : 'Like removed',
+        data: { liked, likeCount, likes: post.likes },
+    });
+});
 
+export const commentPost = asyncHandler(async (req, res) => {
+    const { post, comment } = await commentPostService(
+        req.params.postId,
+        req.user,
+        req.body.content
+    );
 
-export const commentPost = async (req, res) => {
-    try {
-        const postId = req.params.postId;
-        console.log('postId:', postId); // Debugging line
-        const post = await commentPostService(req, postId);
-        if (!post) {
-            res.status(404).json({ message: "no post found" });
-        }
-        res.status(200).json(post);
-    }
-    catch (err) {
-        return res.status(500).json(err.message);
-    }
+    await notify({
+        recipient: post.author._id ?? post.author,
+        actor: req.user._id,
+        type: 'comment',
+        post: post._id,
+        preview: comment.content.slice(0, 140),
+    });
 
-}
+    res.status(201).json({ success: true, data: post });
+});
 
+export const feedPosts = asyncHandler(async (req, res) => {
+    const result = await feedPostsService(req.user._id, req.validatedQuery);
+    res.status(200).json({ success: true, ...result });
+});
 
-export const feedPosts = async (req, res) => {
-    try {
-
-        const userId = req.user._id;
-        const feed = await feedPostsService(userId);
-        if (!feed) {
-            return res.status(404).json("feed not found");
-        }
-        console.log(feed);
-        return res.status(200).json(feed);
-    }
-    catch (err) {
-        return res.status(500).json(err.message);
-    }
-}
-
-export const searchPosts = async (req, res) => {
-    // console.log('Search query:', req.query.q); // Debugging line
-    try{
-        const searchQuery = req.query.q; // Assuming the search query is passed as a query parameter
-        if (!searchQuery) {
-            return res.status(400).json({ message: 'Search query is required' });
-        }
-
-        const posts = await searchPostsService(searchQuery);
-        if (!posts || posts.length === 0) {
-            return res.status(404).json({ message: 'No posts found' });
-        }
-
-        return res.status(200).json(posts);
-    }
-    catch (err) {
-        return res.status(500).json(err.message);
-    }
-}
+export const searchPosts = asyncHandler(async (req, res) => {
+    const { q, ...pagination } = req.validatedQuery;
+    const result = await searchPostsService(q, pagination);
+    res.status(200).json({ success: true, ...result });
+});
