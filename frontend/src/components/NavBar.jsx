@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/create-post', label: 'Create', icon: '✏️' },
   { to: '/messages', label: 'Messages', icon: '💬' },
   { to: '/profile', label: 'Profile', icon: '👤' },
+  { to: '/sessions', label: 'Devices', icon: '🔒' },
 ];
 
 /**

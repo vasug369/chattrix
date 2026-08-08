@@ -1,11 +1,14 @@
 import express from 'express';
 import {
     forgotPassword,
+    listSessions,
     login,
     logout,
     performPasswordReset,
     refresh,
     register,
+    revokeOtherSessions,
+    revokeSession,
     sendVerifyOtp,
     validate,
     verifyEmail,
@@ -19,6 +22,7 @@ import {
     registerSchema,
     resetPasswordSchema,
     sendVerifyOtpSchema,
+    sessionIdSchema,
     verifyEmailSchema,
 } from '../validation/auth.schema.js';
 
@@ -37,5 +41,12 @@ authRouter.post('/verify-email', authLimiter, validateRequest(verifyEmailSchema)
 // Password reset
 authRouter.post('/forgot-password', otpLimiter, validateRequest(forgotPasswordSchema), forgotPassword);
 authRouter.post('/reset-password', authLimiter, validateRequest(resetPasswordSchema), performPasswordReset);
+
+// Session management ("where you're logged in"). These sit behind
+// authMiddleware individually rather than under the protected router, because
+// the rest of this file is deliberately public.
+authRouter.get('/sessions', authMiddleware, listSessions);
+authRouter.delete('/sessions', authMiddleware, revokeOtherSessions);
+authRouter.delete('/sessions/:id', authMiddleware, validateRequest(sessionIdSchema), revokeSession);
 
 export default authRouter;
