@@ -3,6 +3,7 @@ import Session from '../src/models/session.model.js';
 import User from '../src/models/user.model.js';
 import { describeDevice } from '../src/services/sessionService.js';
 import { authenticateHandshake } from '../src/realtime/socketAuth.js';
+import { disconnectSession } from '../src/realtime/socket.js';
 import { app, createUser, request } from './helpers.js';
 
 /** Log in again as an existing user and hand back the raw cookie header. */
@@ -179,7 +180,11 @@ describe('socket handshake authentication', () => {
     const { payload, id } = await createUser();
     const { cookies } = await loginWith(payload);
 
-    await expect(authenticateHandshake(handshakeWith(cookies))).resolves.toBe(id);
+    const identity = await authenticateHandshake(handshakeWith(cookies));
+    expect(identity.userId).toBe(id);
+    // The jti travels with the identity so the socket can be matched to its
+    // session and closed when that session is revoked.
+    expect(identity.jti).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('ignores a client-supplied userId in the query', async () => {
@@ -193,7 +198,8 @@ describe('socket handshake authentication', () => {
     // never consulted.
     const handshake = { headers: { cookie: cookies.join('; ') }, query: { userId: victim.id } };
 
-    await expect(authenticateHandshake(handshake)).resolves.toBe(attacker.id);
+    const identity = await authenticateHandshake(handshake);
+    expect(identity.userId).toBe(attacker.id);
   });
 
   it('rejects a handshake with no cookie', async () => {
@@ -246,5 +252,45 @@ describe('describeDevice', () => {
     // Both send a Chrome token in their UA, so ordering in the check matters.
     expect(describeDevice('Windows NT 10.0 Chrome/120 Safari/537 OPR/106.0')).toBe('Opera on Windows');
     expect(describeDevice('Windows NT 10.0 Chrome/120 Safari/537 Edg/120')).toBe('Edge on Windows');
+  });
+});
+
+describe('revocation closes the session\'s sockets', () => {
+  it('disconnectSession is a safe no-op before initSocket', () => {
+    // Every revocation path calls this. If it threw when Socket.io was not
+    // running — as in the whole HTTP test suite — revoking would 500.
+    expect(() => disconnectSession('some-jti')).not.toThrow();
+    expect(disconnectSession('some-jti')).toBe(0);
+    expect(disconnectSession(null)).toBe(0);
+    expect(disconnectSession(undefined)).toBe(0);
+  });
+
+  it('revoking a session still succeeds with no socket layer running', async () => {
+    // Regression: the revoke endpoints now reach into the realtime module.
+    // A missing/uninitialised io must not turn a 200 into a 500.
+    const { agent, payload } = await createUser();
+    await loginWith(payload, 'Mozilla/5.0 (Linux; Android 14) Chrome/120.0');
+
+    const list = await agent.get('/api/auth/sessions').expect(200);
+    const target = list.body.data.find((s) => !s.current);
+
+    await agent.delete(`/api/auth/sessions/${target.id}`).expect(200);
+    await agent.delete('/api/auth/sessions').expect(200);
+  });
+
+  it('password reset revokes sessions without a socket layer', async () => {
+    const { id, payload } = await createUser();
+    await loginWith(payload, 'Mozilla/5.0 (Linux; Android 14) Chrome/120.0');
+
+    const { resetPassword } = await import('../src/services/authService.js');
+    const { hashOtp, otpExpiry } = await import('../src/utils/otp.js');
+    await User.updateOne(
+      { _id: id },
+      { $set: { resetOtp: await hashOtp('123456'), resetOtpExpiry: otpExpiry(), otpAttempts: 0 } }
+    );
+
+    await expect(
+      resetPassword({ email: payload.email, otp: '123456', newPassword: 'BrandNewPass1' })
+    ).resolves.toBeTruthy();
   });
 });
