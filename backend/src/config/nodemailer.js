@@ -22,6 +22,13 @@ const buildTransporter = () => {
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+    // Without these, a misconfigured/unreachable host hangs the socket
+    // indefinitely and the try/catch in sendMail() below never gets a
+    // chance to run — the request that triggered it (e.g. registration)
+    // blocks for minutes instead of degrading gracefully as intended.
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
   });
 };
 
