@@ -17,7 +17,10 @@ import { findLiveSession } from '../services/sessionService.js';
  * Lives in its own module (rather than inline in socket.js) so it can be
  * tested without standing up an HTTP server and a websocket client.
  *
- * @returns {Promise<string|null>} the authenticated user id, or null.
+ * @returns {Promise<{userId: string, jti: string}|null>} the authenticated
+ *   identity, or null. The jti is returned alongside the id so a socket can
+ *   later be matched to the session it belongs to and closed when that session
+ *   is revoked.
  */
 export const authenticateHandshake = async (handshake) => {
     const header = handshake?.headers?.cookie;
@@ -54,18 +57,22 @@ export const authenticateHandshake = async (handshake) => {
     // two ever disagreed, the row that survives revocation should win.
     if (String(session.user) !== String(decoded.id)) return null;
 
-    return String(decoded.id);
+    return { userId: String(decoded.id), jti: session.jti };
 };
 
 /** Socket.io middleware wrapper around {@link authenticateHandshake}. */
 export const socketAuthMiddleware = async (socket, next) => {
     try {
-        const userId = await authenticateHandshake(socket.handshake);
-        if (!userId) return next(new Error('Unauthorized'));
+        const identity = await authenticateHandshake(socket.handshake);
+        if (!identity) return next(new Error('Unauthorized'));
+        const { userId, jti } = identity;
 
         // Read by the connection handler. Nothing downstream should ever look
         // at handshake.query.userId again.
         socket.userId = userId;
+        // Lets a single device's sockets be closed when its session is revoked,
+        // without touching the same user's other devices.
+        socket.sessionJti = jti;
         return next();
     } catch {
         return next(new Error('Unauthorized'));

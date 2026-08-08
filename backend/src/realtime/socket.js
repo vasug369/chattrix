@@ -18,6 +18,17 @@ let io = null;
 /** userId -> Set of socket ids (a user may have several tabs open). */
 const userSockets = new Map();
 
+/**
+ * jti -> Set of socket ids.
+ *
+ * The handshake is authenticated, but only once. Without this, a socket opened
+ * before a session was revoked stayed connected indefinitely: the device could
+ * no longer act (every HTTP request 401s) but carried on *receiving* — live
+ * notifications and incoming direct messages — until the user happened to
+ * reload. Signing a device out has to close its socket too.
+ */
+const sessionSockets = new Map();
+
 export const initSocket = (httpServer) => {
     io = new Server(httpServer, {
         cors: {
@@ -45,6 +56,14 @@ export const initSocket = (httpServer) => {
         userSockets.get(userId).add(socket.id);
         socket.join(roomFor(userId));
 
+        // Track by session as well as by user, so one device can be cut off
+        // without disturbing the user's other devices.
+        const jti = socket.sessionJti;
+        if (jti) {
+            if (!sessionSockets.has(jti)) sessionSockets.set(jti, new Set());
+            sessionSockets.get(jti).add(socket.id);
+        }
+
         broadcastOnlineUsers();
 
         socket.on('typing', ({ to }) => {
@@ -56,6 +75,12 @@ export const initSocket = (httpServer) => {
         });
 
         socket.on('disconnect', () => {
+            const bySession = sessionSockets.get(socket.sessionJti);
+            if (bySession) {
+                bySession.delete(socket.id);
+                if (bySession.size === 0) sessionSockets.delete(socket.sessionJti);
+            }
+
             const sockets = userSockets.get(userId);
             if (!sockets) return;
             sockets.delete(socket.id);
@@ -89,8 +114,44 @@ export const emitToUser = (userId, event, payload) => {
 
 export const getIO = () => io;
 
+/**
+ * Close every socket belonging to a revoked session.
+ *
+ * Called whenever a session is revoked, so a signed-out device stops receiving
+ * events immediately rather than at its next reload. The client is told why
+ * before the socket closes, so it can drop to the login screen instead of
+ * silently reconnecting in a loop.
+ *
+ * Single-instance only: sockets live in this process's memory, so with more
+ * than one server the revoked device stays connected to whichever instance
+ * holds it. Doing this properly across instances needs the Socket.io Redis
+ * adapter, which is the same prerequisite as scaling presence.
+ *
+ * @returns {number} how many sockets were closed
+ */
+export const disconnectSession = (jti) => {
+    if (!io || !jti) return 0;
+
+    const socketIds = sessionSockets.get(jti);
+    if (!socketIds || socketIds.size === 0) return 0;
+
+    // Copied, because disconnecting mutates the set through the disconnect
+    // handler while we are iterating it.
+    const ids = [...socketIds];
+    for (const id of ids) {
+        const socket = io.sockets.sockets.get(id);
+        if (!socket) continue;
+        socket.emit('session:revoked', { reason: 'This device was signed out' });
+        socket.disconnect(true);
+    }
+
+    sessionSockets.delete(jti);
+    return ids.length;
+};
+
 /** Test helper — drops state between suites. */
 export const resetSocketState = () => {
     userSockets.clear();
+    sessionSockets.clear();
     io = null;
 };
