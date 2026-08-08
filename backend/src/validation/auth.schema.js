@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { email, name, otpCode, password } from './common.js';
+import { email, idParam, name, otpCode, password } from './common.js';
 
 export const registerSchema = {
   body: z.object({
@@ -38,4 +38,13 @@ export const resetPasswordSchema = {
     otp: otpCode,
     newPassword: password,
   }),
+};
+
+/**
+ * Revoking a session takes its public _id (never the jti, which does not leave
+ * the server). Validating the shape here means a malformed id is a 422 rather
+ * than a Mongoose CastError further in.
+ */
+export const sessionIdSchema = {
+  params: idParam,
 };

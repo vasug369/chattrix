@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import env from '../config/env.js';
+import { socketAuthMiddleware } from './socketAuth.js';
 
 /**
  * Socket.io lives here rather than in server.js so that importing the Express
@@ -26,9 +27,16 @@ export const initSocket = (httpServer) => {
         },
     });
 
+    // Rejects the connection before `connection` ever fires if the handshake
+    // cookie is missing, invalid, or names a revoked session.
+    io.use(socketAuthMiddleware);
+
     io.on('connection', (socket) => {
-        const userId = socket.handshake.query?.userId;
-        if (!userId || userId === 'undefined' || userId === 'null') {
+        // Set by socketAuthMiddleware from the verified token. Reading
+        // handshake.query.userId here instead was the vulnerability: it let a
+        // client pick whose events it received.
+        const userId = socket.userId;
+        if (!userId) {
             socket.disconnect(true);
             return;
         }

@@ -15,6 +15,7 @@ import Profile from './components/Profile';
 import Messages from './components/Messages';
 import VerifyEmail from './components/VerifyEmail';
 import ForgotPassword from './components/ForgotPassword';
+import Sessions from './components/Sessions';
 
 /** Protected pages share the nav bar; the auth pages deliberately do not. */
 const Shell = ({ children }) => (
@@ -43,6 +44,7 @@ function App() {
             <Route path="/profile" element={<Shell><Profile /></Shell>} />
             <Route path="/profile/:userId" element={<Shell><Profile /></Shell>} />
             <Route path="/messages" element={<Shell><Messages /></Shell>} />
+            <Route path="/sessions" element={<Shell><Sessions /></Shell>} />
 
             <Route
               path="*"
