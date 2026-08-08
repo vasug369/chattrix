@@ -11,7 +11,7 @@ A social platform combining microblogging with real-time messaging, built with R
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
 | Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
 | Validation | Zod (every endpoint) |
-| Testing    | Vitest + Supertest + mongodb-memory-server (107 tests) |
+| Testing    | Vitest + Supertest + mongodb-memory-server (135 tests) |
 | Database   | MongoDB Atlas |
 | Deployment | Frontend: Vercel · Backend: Render |
 
@@ -87,7 +87,7 @@ npm run dev        # Vite, port 5173
 
 ```bash
 cd backend
-npm test           # 107 integration tests, ~4s
+npm test           # 135 integration tests, ~4s
 npm run test:watch
 npm run test:coverage
 ```
@@ -117,6 +117,19 @@ outright rather than silently reaching a Mongoose update.
 start a listener or open a database connection, which is what makes the app
 testable with Supertest.
 
+**Sessions are revocable at two granularities.** A `tokenVersion` on the user
+kills every session at once — the right hammer for a password reset. Each login
+also writes a `Session` row and stamps its `jti` into both tokens, so a single
+device can be signed out without disturbing the others. The cost is one indexed
+lookup per request; `lastSeenAt` is only written when it is more than a minute
+stale, so reads do not silently become writes.
+
+**The socket handshake is authenticated.** Identity comes from the session
+cookie the browser already sends with the handshake, verified in
+`realtime/socketAuth.js`. It previously came from `handshake.query.userId`,
+which the client controls — so anyone could connect as anyone and receive their
+notifications and direct messages.
+
 **Secrets come from the environment only.** No credential has a hardcoded
 fallback. Where a service is unconfigured (mail, Cloudinary) the app degrades
 loudly and predictably instead of pointing at somebody else's account.
@@ -140,6 +153,9 @@ All routes are under `/api`. Everything except `/api/auth/*` and
 | POST | `/auth/verify-email` | Redeem a verification code |
 | POST | `/auth/forgot-password` | Issue a password-reset code |
 | POST | `/auth/reset-password` | Redeem it; revokes all existing sessions |
+| GET  | `/auth/sessions` | List active devices, flagging the current one |
+| DELETE | `/auth/sessions/:id` | Sign out one device |
+| DELETE | `/auth/sessions` | Sign out every *other* device |
 
 ### Posts
 `POST /post/create` · `GET /post` · `GET /post/feed` · `GET /post/search?q=`
@@ -165,6 +181,10 @@ Edit and delete require ownership. All list endpoints are paginated
 Server emits `getOnlineUsers`, `newMessage`, `messagesRead`,
 `notification:new`, `notification:count`, `typing`, `stopTyping`.
 Client emits `typing`, `stopTyping`.
+
+Connections are rejected at the handshake unless they carry a cookie naming a
+live session, so a remotely signed-out device loses its socket as well as its
+HTTP access.
 
 ---
 

@@ -169,4 +169,37 @@ describe('session handling', () => {
     await User.findByIdAndDelete(id);
     await agent.get('/api/user/me').expect(401);
   });
+
+  it('keeps a refreshed session alive for an account with a bumped tokenVersion', async () => {
+    // Regression: the refresh branch minted the replacement access token
+    // without a tokenVersion claim. For a fresh account (version 0) the
+    // `?? 0` fallback masked it, but any account that had reset its password
+    // failed the version check on the very next request — so those users were
+    // logged out every time their 15-minute access token rolled over.
+    const { id, payload } = await createUser();
+    await User.updateOne({ _id: id }, { $set: { tokenVersion: 3 } });
+
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: payload.email, password: payload.password })
+      .expect(200);
+
+    const refreshCookie = login.headers['set-cookie']
+      .map((c) => c.split(';')[0])
+      .find((c) => c.startsWith('refreshToken='));
+
+    // Send only the refresh cookie, which is what the browser is left with
+    // once the access token expires. This drives the refresh branch.
+    const refreshed = await request(app)
+      .get('/api/user/me')
+      .set('Cookie', [refreshCookie])
+      .expect(200);
+
+    const reissued = refreshed.headers['set-cookie']
+      .map((c) => c.split(';')[0])
+      .find((c) => c.startsWith('token='));
+
+    // The token just handed back must itself be accepted.
+    await request(app).get('/api/user/me').set('Cookie', [reissued]).expect(200);
+  });
 });

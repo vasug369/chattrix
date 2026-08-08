@@ -5,6 +5,7 @@ import { sendMail } from '../config/nodemailer.js';
 import User from '../models/user.model.js';
 import { badRequest, conflict, unauthorized } from '../utils/AppError.js';
 import { compareOtp, generateOtp, hashOtp, isExpired, otpExpiry } from '../utils/otp.js';
+import { createSession, revokeAllSessionsService } from './sessionService.js';
 
 /**
  * Services return values and throw AppError; they no longer receive `res`.
@@ -26,18 +27,25 @@ const cookieBase = () => ({
 export const accessCookieOptions = () => ({ ...cookieBase(), maxAge: 15 * 60 * 1000 });
 export const refreshCookieOptions = () => ({ ...cookieBase(), maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-export const issueTokens = (user) => ({
+/**
+ * Mint the token pair for a session.
+ *
+ * Both tokens carry the same `jti`, which names a row in the Session
+ * collection. That is what makes per-device sign-out possible: `tokenVersion`
+ * alone can only revoke everything at once.
+ */
+export const issueTokens = (user, jti) => ({
   // tokenVersion travels in the access token as well as the refresh token.
   // Checking it only on refresh left a window of one access-token lifetime
   // (15 minutes) in which a password reset did not actually end an active
   // session.
   token: jwt.sign(
-    { id: user._id, name: user.name, email: user.email, tokenVersion: user.tokenVersion ?? 0 },
+    { id: user._id, name: user.name, email: user.email, jti, tokenVersion: user.tokenVersion ?? 0 },
     env.JWT_SECRET,
     { expiresIn: env.ACCESS_TOKEN_TTL }
   ),
   refreshToken: jwt.sign(
-    { id: user._id, tokenVersion: user.tokenVersion ?? 0 },
+    { id: user._id, jti, tokenVersion: user.tokenVersion ?? 0 },
     env.JWT_REFRESH_SECRET,
     { expiresIn: env.REFRESH_TOKEN_TTL }
   ),
@@ -73,7 +81,7 @@ export const registerUser = async ({ name, email, password, pic }) => {
   return user;
 };
 
-export const loginUser = async ({ email, password }) => {
+export const loginUser = async ({ email, password }, req) => {
   // password is `select: false` on the schema, so it must be asked for.
   const user = await User.findOne({ email }).select('+password');
 
@@ -85,7 +93,10 @@ export const loginUser = async ({ email, password }) => {
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw unauthorized('Invalid email or password');
 
-  return { user, ...issueTokens(user) };
+  // A successful login opens a session row; the tokens point at it by jti.
+  const session = await createSession(user._id, req);
+
+  return { user, session, ...issueTokens(user, session.jti) };
 };
 
 /** Issue (or re-issue) an email-verification code. */
@@ -174,6 +185,11 @@ export const resetPassword = async ({ email, otp, newPassword }) => {
   // prompted the reset keeps their existing session.
   user.tokenVersion += 1;
   await user.save();
+
+  // tokenVersion alone already invalidates the tokens. Marking the session
+  // rows revoked as well keeps the "where you're logged in" list honest —
+  // otherwise it would keep listing devices that can no longer authenticate.
+  await revokeAllSessionsService(user._id);
 
   return user;
 };
