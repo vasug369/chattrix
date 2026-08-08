@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Session from '../models/session.model.js';
 import { notFound } from '../utils/AppError.js';
+import { disconnectSession } from '../realtime/socket.js';
 
 /**
  * Session lifecycle: create on login, validate on every request, revoke on
@@ -135,25 +136,44 @@ export const revokeSessionService = async (userId, sessionId) => {
     );
 
     if (!session) throw notFound('Session not found');
+
+    // Revoking only blocked HTTP. A socket opened before the revocation stayed
+    // connected, so the signed-out device kept receiving notifications and
+    // direct messages until it happened to reload.
+    disconnectSession(session.jti);
+
     return session;
 };
 
 /** Sign out every device except the one making the request. */
 export const revokeOtherSessionsService = async (userId, currentJti) => {
+    // Read the jtis before updating: afterwards they no longer match the
+    // "not revoked" filter, so there would be nothing left to disconnect.
+    const doomed = await Session.find(
+        { user: userId, revokedAt: null, jti: { $ne: currentJti } },
+        { jti: 1 }
+    ).lean();
+
     const result = await Session.updateMany(
         { user: userId, revokedAt: null, jti: { $ne: currentJti } },
         { $set: { revokedAt: new Date() } }
     );
+
+    for (const s of doomed) disconnectSession(s.jti);
 
     return { revoked: result.modifiedCount ?? 0 };
 };
 
 /** Used by logout and by password reset, which must clear the lot. */
 export const revokeAllSessionsService = async (userId) => {
+    const doomed = await Session.find({ user: userId, revokedAt: null }, { jti: 1 }).lean();
+
     const result = await Session.updateMany(
         { user: userId, revokedAt: null },
         { $set: { revokedAt: new Date() } }
     );
+
+    for (const s of doomed) disconnectSession(s.jti);
 
     return { revoked: result.modifiedCount ?? 0 };
 };
@@ -175,4 +195,5 @@ export const extendSession = async (jti) => {
 export const revokeByJti = async (jti) => {
     if (!jti) return;
     await Session.updateOne({ jti, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    disconnectSession(jti);
 };
