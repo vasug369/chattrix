@@ -35,7 +35,15 @@ const envSchema = z.object({
 
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:5173,https://chattrix-nmlf.vercel.app'),
+    .default(
+      [
+        'http://localhost:5173',
+        'https://chattrix-social.vercel.app',
+        // Retained so the previous deployment URL keeps working during the
+        // domain change; safe to drop once nothing points at it.
+        'https://chattrix-nmlf.vercel.app',
+      ].join(',')
+    ),
 
   // Mail — optional so local dev and tests run without SMTP credentials.
   SMTP_HOST: z.string().default('sandbox.smtp.mailtrap.io'),
@@ -56,6 +64,29 @@ const envSchema = z.object({
   // register+login round-trip ~300ms, which dominated the suite runtime.
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(isTest ? 4 : 10),
 });
+
+/**
+ * Normalise one allow-list entry so it can be compared to a browser `Origin`.
+ *
+ * A browser always sends scheme://host[:port] with no trailing slash and a
+ * lowercase scheme and host. Anything else in the configured list will simply
+ * never match, and the failure is silent: the request completes, the response
+ * just carries no CORS header, and the browser blocks it on the client side
+ * with nothing in the server log. Quotes, whitespace and a trailing slash are
+ * the three ways that has actually happened here.
+ */
+export const normalizeOrigin = (value = '') =>
+  String(value)
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\/+$/, '')
+    .replace(/^([A-Za-z][A-Za-z0-9+.-]*:\/\/[^/]+)/, (m) => m.toLowerCase());
+
+export const parseOrigins = (value = '') =>
+  String(value)
+    .split(',')
+    .map(normalizeOrigin)
+    .filter(Boolean);
 
 const parsed = envSchema.safeParse(process.env);
 
@@ -81,9 +112,7 @@ export const env = {
   mongoUri,
   isProduction: raw.NODE_ENV === 'production',
   isTest: raw.NODE_ENV === 'test',
-  corsOrigins: raw.CORS_ORIGINS.split(',')
-    .map((o) => o.trim())
-    .filter(Boolean),
+  corsOrigins: parseOrigins(raw.CORS_ORIGINS),
   // Never send real mail from a test run. dotenv loads the developer's .env
   // even under NODE_ENV=test, so without this guard every registration in the
   // suite opened a live SMTP connection (~7s per call) and spammed the inbox.
