@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import User from '../models/user.model.js';
 import { unauthorized } from '../utils/AppError.js';
+import { findLiveSession, touchSession } from '../services/sessionService.js';
 
 const accessCookieOptions = () => ({
   httpOnly: true,
@@ -43,7 +44,15 @@ export const authMiddleware = async (req, res, next) => {
         if ((decoded.tokenVersion ?? 0) !== user.tokenVersion) {
           return next(unauthorized('Session has been revoked'));
         }
+
+        // tokenVersion is all-or-nothing; the jti is what lets a single device
+        // be signed out while the others keep working.
+        const session = await findLiveSession(decoded.jti);
+        if (!session) return next(unauthorized('Session has been revoked'));
+        await touchSession(session);
+
         req.user = user;
+        req.session = session;
         return next();
       } catch (err) {
         // Anything other than plain expiry is not recoverable by refreshing.
@@ -71,14 +80,34 @@ export const authMiddleware = async (req, res, next) => {
       return next(unauthorized('Session has been revoked'));
     }
 
+    // A device signed out remotely still holds a syntactically valid refresh
+    // token. Without this check it would quietly mint itself a new access
+    // token and carry on, which would make the sign-out button a lie.
+    const session = await findLiveSession(decodedRefresh.jti);
+    if (!session) return next(unauthorized('Session has been revoked'));
+    await touchSession(session);
+
+    // Both claims must be carried through. Minting the refreshed token without
+    // tokenVersion meant `decoded.tokenVersion ?? 0` evaluated to 0 on the next
+    // request, so any account whose version had been bumped by a password
+    // reset failed the check above and was logged out — every 15 minutes,
+    // forever, with no way back except logging in again. Dropping the jti
+    // would fail the session lookup the same way.
     const newAccessToken = jwt.sign(
-      { id: user._id, name: user.name, email: user.email },
+      {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        jti: decodedRefresh.jti,
+        tokenVersion: user.tokenVersion ?? 0,
+      },
       env.JWT_SECRET,
       { expiresIn: env.ACCESS_TOKEN_TTL }
     );
     res.cookie('token', newAccessToken, accessCookieOptions());
 
     req.user = user;
+    req.session = session;
     return next();
   } catch (error) {
     return next(error);
