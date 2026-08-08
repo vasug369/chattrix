@@ -11,7 +11,7 @@ A social platform combining microblogging with real-time messaging, built with R
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
 | Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
 | Validation | Zod (every endpoint) |
-| Testing    | Vitest + Supertest + mongodb-memory-server (151 tests) |
+| Testing    | Vitest + Supertest + mongodb-memory-server (161 tests) |
 | Database   | MongoDB Atlas |
 | Deployment | Frontend: Vercel · Backend: Render |
 
@@ -87,7 +87,7 @@ npm run dev        # Vite, port 5173
 
 ```bash
 cd backend
-npm test           # 151 integration tests, ~5s
+npm test           # 161 integration tests, ~5s
 npm run test:watch
 npm run test:coverage
 ```
@@ -248,6 +248,14 @@ Both `prefers-reduced-motion` (stops the drift) and a
   bundle asking every visitor's own machine for the API. Vite loads
   `.env.[mode]` only in that mode and it outranks `.env.local`, so this affects
   `npm run build` and leaves `npm run dev` alone.
+- **Mail goes through Resend's HTTPS API, not SMTP.** Managed hosts often
+  filter outbound SMTP ports; that presents as an ~8s connection timeout rather
+  than an auth error, and previously added that delay to every registration.
+  Until a domain is verified at resend.com/domains, Resend accepts only
+  `onboarding@resend.dev` as the sender and delivers only to the Resend account
+  owner's address. The startup log states which provider is live.
+- **Mail is queued, never awaited.** `queueMail()` hands off without blocking,
+  so a dead provider cannot slow a signup. Registration went from 9.6s to 0.2s.
 - **`CORS_ORIGINS` entries must be bare origins** — `scheme://host[:port]`, no
   trailing slash, no quotes, no path. A malformed entry matches nothing and
   fails silently: the request returns 200 with no CORS header and the browser

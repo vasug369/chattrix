@@ -50,7 +50,13 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().default(2525),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SENDER_EMAIL: z.string().default('no-reply@chattrix.app'),
+  // Resend HTTP API. Preferred over SMTP because managed hosts commonly
+  // filter outbound SMTP ports, which is what broke the previous setup.
+  RESEND_API_KEY: z.string().optional(),
+
+  // Until a domain is verified with the provider, this is the only address
+  // Resend will accept as a sender. Change it once your own domain is added.
+  SENDER_EMAIL: z.string().default('Chattrix <onboarding@resend.dev>'),
 
   // Cloudinary — optional; uploads degrade gracefully when unset.
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
@@ -117,6 +123,11 @@ export const env = {
   // even under NODE_ENV=test, so without this guard every registration in the
   // suite opened a live SMTP connection (~7s per call) and spammed the inbox.
   mailEnabled: Boolean(raw.SMTP_USER && raw.SMTP_PASS) && !isTest,
+
+  // Same guard for the HTTP provider, and for the same reason: adding
+  // RESEND_API_KEY to a local .env would otherwise make the test suite send
+  // real email to whatever addresses the fixtures happen to use.
+  resendEnabled: Boolean(raw.RESEND_API_KEY) && !isTest,
   cloudinaryEnabled: Boolean(
     raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET
   ),
