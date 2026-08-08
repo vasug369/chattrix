@@ -4,6 +4,7 @@ import env from './config/env.js';
 import connectDB from './config/dbConfig.js';
 import app from './app.js';
 import { initSocket } from './realtime/socket.js';
+import { describeMailSetup } from './config/mailer.js';
 
 /**
  * Process entry point.
@@ -32,6 +33,11 @@ const start = async () => {
         if (env.corsOrigins.length === 0) {
             console.warn('CORS_ORIGINS parsed to nothing. Check the value set in the environment.');
         }
+
+        // Which provider is live, and whether it can actually reach a real
+        // inbox. A sandbox host silently captures mail rather than delivering
+        // it, which looks identical to "mail is broken" from the outside.
+        console.log(describeMailSetup());
     });
 };
 
