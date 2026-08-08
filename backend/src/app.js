@@ -3,7 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
-import env from './config/env.js';
+import env, { normalizeOrigin } from './config/env.js';
 import authRouter from './routes/authRoutes.js';
 import postRouter from './routes/postRoutes.js';
 import userRouter from './routes/userRoutes.js';
@@ -33,8 +33,12 @@ app.use(
         // wildcard origin is rejected by browsers anyway, so an unknown origin
         // gets no CORS headers rather than a permissive one.
         origin(origin, callback) {
-            if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
-            return callback(null, false);
+            // Normalised on both sides: the configured list is cleaned at boot,
+            // and the incoming header is cleaned here, so a stray trailing
+            // slash or a difference in case cannot silently reject a legitimate
+            // origin.
+            if (!origin) return callback(null, true);
+            return callback(null, env.corsOrigins.includes(normalizeOrigin(origin)));
         },
         credentials: true,
     })

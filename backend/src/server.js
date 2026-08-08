@@ -20,6 +20,18 @@ const start = async () => {
     await connectDB();
     server.listen(env.PORT, () => {
         console.log(`Chattrix API listening on http://localhost:${env.PORT}`);
+
+        // A CORS misconfiguration is otherwise invisible from the server side:
+        // the request succeeds, the response simply carries no CORS header, and
+        // the browser blocks it with nothing written to the log. Printing the
+        // parsed list turns "the site mysteriously cannot reach the API" into
+        // one glance at the deploy log.
+        console.log(
+            `CORS allow-list (${env.corsOrigins.length}): ${env.corsOrigins.join(', ') || '(empty — every cross-origin request will be blocked)'}`
+        );
+        if (env.corsOrigins.length === 0) {
+            console.warn('CORS_ORIGINS parsed to nothing. Check the value set in the environment.');
+        }
     });
 };
 
