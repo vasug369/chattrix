@@ -15,16 +15,37 @@ import env from './env.js';
  */
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
 /** Wall-clock ceiling for a single send, so a hung provider cannot pile up. */
 const SEND_TIMEOUT_MS = 8000;
 
 const providerName = () => {
-    // Both flags are false under NODE_ENV=test, so a developer's real
+    // An explicit choice always wins, so that having two credentials
+    // configured cannot silently select the wrong one.
+    if (env.MAIL_PROVIDER) return env.isTest ? 'disabled' : env.MAIL_PROVIDER;
+
+    // All three flags are false under NODE_ENV=test, so a developer's real
     // credentials in .env can never make the suite send live mail.
+    if (env.brevoEnabled) return 'brevo';
     if (env.resendEnabled) return 'resend';
     if (env.mailEnabled) return 'smtp';
     return 'disabled';
+};
+
+/**
+ * Split "Name <address@host>" into Brevo's structured sender.
+ *
+ * Resend accepts the combined RFC-5322 form; Brevo requires name and email as
+ * separate fields, so SENDER_EMAIL has to work in both shapes.
+ */
+export const parseSender = (value = '') => {
+    const match = String(value).match(/^\s*(.*?)\s*<([^>]*)>\s*$/);
+    // `[^>]*` is greedy and `\s*` can match empty, so the inner value has to be
+    // trimmed explicitly — matching it inside the group silently kept trailing
+    // spaces in the address and produced a sender the provider would reject.
+    if (match) return { name: match[1] || undefined, email: match[2].trim() };
+    return { email: String(value).trim() };
 };
 
 export const mailProvider = providerName();
@@ -65,6 +86,42 @@ const sendViaResend = async ({ to, subject, text, html }) => {
     return true;
 };
 
+const sendViaBrevo = async ({ to, subject, text, html }) => {
+    const res = await fetch(BREVO_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'api-key': env.BREVO_API_KEY,
+            'Content-Type': 'application/json',
+            accept: 'application/json',
+        },
+        body: JSON.stringify({
+            sender: parseSender(env.SENDER_EMAIL),
+            to: [{ email: to }],
+            subject,
+            ...(text ? { textContent: text } : {}),
+            ...(html ? { htmlContent: html } : {}),
+        }),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+        let detail = '';
+        try {
+            const body = await res.json();
+            detail = body?.message ?? JSON.stringify(body);
+        } catch {
+            detail = `HTTP ${res.status}`;
+        }
+        // The most likely refusal on a new free account is
+        // "Your SMTP account is not yet activated" — Brevo gates transactional
+        // sending behind a manual review. Surfacing the text verbatim is what
+        // makes that diagnosable rather than just "mail didn't work".
+        throw new Error(`Brevo rejected the message: ${detail}`);
+    }
+
+    return true;
+};
+
 const buildSmtpTransporter = () =>
     nodemailer.createTransport({
         host: env.SMTP_HOST,
@@ -92,6 +149,11 @@ export const sendMail = async ({ to, subject, text, html }) => {
     try {
         if (mailProvider === 'resend') {
             await sendViaResend({ to, subject, text, html });
+            return true;
+        }
+
+        if (mailProvider === 'brevo') {
+            await sendViaBrevo({ to, subject, text, html });
             return true;
         }
 
@@ -128,6 +190,9 @@ export const describeMailSetup = () => {
     if (mailProvider === 'resend') {
         return `Mail: Resend HTTP API, from "${env.SENDER_EMAIL}"`;
     }
+    if (mailProvider === 'brevo') {
+        return `Mail: Brevo HTTP API, from "${env.SENDER_EMAIL}"`;
+    }
     if (mailProvider === 'smtp') {
         const sandbox = /sandbox/i.test(env.SMTP_HOST);
         return (
@@ -135,7 +200,7 @@ export const describeMailSetup = () => {
             (sandbox ? ' — SANDBOX host: messages are captured, never delivered to real inboxes' : '')
         );
     }
-    return 'Mail: disabled (no RESEND_API_KEY and no SMTP credentials) — messages will only be logged';
+    return 'Mail: disabled (no BREVO_API_KEY, no RESEND_API_KEY and no SMTP credentials) — messages will only be logged';
 };
 
 export default sendMail;
