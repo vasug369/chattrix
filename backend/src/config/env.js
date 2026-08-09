@@ -45,6 +45,12 @@ const envSchema = z.object({
       ].join(',')
     ),
 
+  // Public address of the frontend, used for links inside emails. Deliberately
+  // not derived from CORS_ORIGINS: that list is ordered for local development,
+  // so its first entry is usually localhost — which would ship a dead link to
+  // every new user.
+  APP_URL: z.string().url().default('https://chattrix-social.vercel.app'),
+
   // Mail — optional so local dev and tests run without SMTP credentials.
   SMTP_HOST: z.string().default('sandbox.smtp.mailtrap.io'),
   SMTP_PORT: z.coerce.number().int().positive().default(2525),

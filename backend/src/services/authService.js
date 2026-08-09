@@ -59,6 +59,67 @@ const otpEmail = (name, otp, purpose) => ({
       : `Hi ${name},\n\nYour Chattrix password reset code is ${otp}. It expires in ${env.OTP_TTL_MINUTES} minutes.\n\nIf you didn't request a reset, your account is still safe — just ignore this email.`,
 });
 
+/**
+ * `name` is user-controlled and goes into an HTML body, so it has to be
+ * escaped. Mail clients render HTML: a display name of `<img onerror=...>`
+ * would otherwise be injected into every welcome message we send.
+ */
+const escapeHtml = (value = '') =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/**
+ * Sent once, at registration rather than after verification.
+ *
+ * Verification is not currently enforced anywhere (requireVerifiedEmail exists
+ * but is not wired to a route), so welcoming people at verification time would
+ * mean most accounts never receive one.
+ */
+const welcomeEmail = (name) => {
+  const safeName = escapeHtml(name);
+  return {
+    subject: 'Welcome to Chattrix 👋',
+    text: [
+      `Hi ${name},`,
+      '',
+      "Welcome to Chattrix — your account is ready.",
+      '',
+      'A few things you can do now:',
+      '  • Share your first post',
+      '  • Follow people and build your feed',
+      '  • Message anyone in real time',
+      '  • Review your signed-in devices under Settings → Sessions',
+      '',
+      `Jump in: ${env.APP_URL}`,
+      '',
+      "If you didn't create this account, you can safely ignore this email.",
+      '',
+      '— The Chattrix team',
+    ].join('\n'),
+    html: `
+<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f2430">
+  <h1 style="font-size:22px;margin:0 0 4px">Welcome to Chattrix 👋</h1>
+  <p style="margin:0 0 20px;color:#6b7280">Hi ${safeName}, your account is ready.</p>
+  <ul style="padding-left:20px;margin:0 0 24px;line-height:1.7">
+    <li>Share your first post</li>
+    <li>Follow people and build your feed</li>
+    <li>Message anyone in real time</li>
+    <li>Review your signed-in devices under <strong>Settings → Sessions</strong></li>
+  </ul>
+  <p style="margin:0 0 24px">
+    <a href="${env.APP_URL}" style="background:#6d5efc;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;display:inline-block">Open Chattrix</a>
+  </p>
+  <p style="font-size:12px;color:#9ca3af;margin:0">
+    If you didn't create this account, you can safely ignore this email.
+  </p>
+</div>`.trim(),
+  };
+};
+
 export const registerUser = async ({ name, email, password, pic }) => {
   const existing = await User.findOne({ email });
   if (existing) throw conflict('An account with that email already exists');
@@ -78,7 +139,11 @@ export const registerUser = async ({ name, email, password, pic }) => {
 
   // Fire-and-forget: the account exists either way, and awaiting the
   // provider previously added its full timeout to every registration.
+  //
+  // The verification code goes first deliberately — it is the one the user is
+  // waiting on, and both land in the same inbox seconds apart.
   queueMail({ to: email, ...otpEmail(name, otp, 'verify') });
+  queueMail({ to: email, ...welcomeEmail(name) });
 
   return user;
 };
