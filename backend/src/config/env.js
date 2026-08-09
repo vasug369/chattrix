@@ -54,6 +54,16 @@ const envSchema = z.object({
   // filter outbound SMTP ports, which is what broke the previous setup.
   RESEND_API_KEY: z.string().optional(),
 
+  // Brevo HTTP API. Like Resend, chosen over SMTP because managed hosts
+  // commonly filter outbound SMTP ports.
+  BREVO_API_KEY: z.string().optional(),
+
+  // Force a provider instead of auto-detecting. Useful when more than one
+  // credential is present and the implicit precedence would pick the wrong
+  // one — a silent misconfiguration is exactly how the CORS allow-list and
+  // the Mailtrap sandbox each went unnoticed.
+  MAIL_PROVIDER: z.enum(['resend', 'brevo', 'smtp', 'disabled']).optional(),
+
   // Until a domain is verified with the provider, this is the only address
   // Resend will accept as a sender. Change it once your own domain is added.
   SENDER_EMAIL: z.string().default('Chattrix <onboarding@resend.dev>'),
@@ -128,6 +138,7 @@ export const env = {
   // RESEND_API_KEY to a local .env would otherwise make the test suite send
   // real email to whatever addresses the fixtures happen to use.
   resendEnabled: Boolean(raw.RESEND_API_KEY) && !isTest,
+  brevoEnabled: Boolean(raw.BREVO_API_KEY) && !isTest,
   cloudinaryEnabled: Boolean(
     raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET
   ),
