@@ -15,7 +15,7 @@ export default function Login() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, likelySignedIn } = useAuth();
 
   // Someone who is already signed in has no business on the login screen.
   useEffect(() => {
@@ -70,7 +70,15 @@ export default function Login() {
     }
   };
 
-  if (isLoading) {
+  // Only a visitor we have reason to believe is already signed in should wait
+  // here. For everyone else — every first-time visitor included — the form
+  // needs no answer from /user/me to be useful, and blocking on it meant
+  // staring at a spinner for the length of a cold start (~10s on Render's free
+  // tier) before a request that was always going to 401 came back.
+  //
+  // Rendering the form unconditionally instead would flash a login screen at
+  // returning users mid-redirect, which reads as "you were signed out".
+  if (isLoading && likelySignedIn) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="gl-spinner" style={{ width: 32, height: 32 }} />
