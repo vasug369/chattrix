@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendMail, queueMail, describeMailSetup, mailProvider } from '../src/config/mailer.js';
+import {
+  sendMail,
+  queueMail,
+  describeMailSetup,
+  mailProvider,
+  parseSender,
+} from '../src/config/mailer.js';
 
 /**
  * Mail is a side effect of the request that triggered it. These lock in the
@@ -57,5 +63,44 @@ describe('describeMailSetup', () => {
 
   it('names the reason so a deploy log answers "why is no mail arriving"', () => {
     expect(describeMailSetup()).toMatch(/RESEND_API_KEY|SMTP/);
+  });
+});
+
+describe('parseSender', () => {
+  it.each([
+    ['Chattrix <no-reply@chattrix.dev>', { name: 'Chattrix', email: 'no-reply@chattrix.dev' }],
+    ['  Chattrix  <  a@b.co  >  ', { name: 'Chattrix', email: 'a@b.co' }],
+    ['plain@address.com', { email: 'plain@address.com' }],
+    ['  spaced@address.com  ', { email: 'spaced@address.com' }],
+  ])('parses %s', (input, expected) => {
+    expect(parseSender(input)).toEqual(expected);
+  });
+
+  it('drops an empty display name rather than sending name: ""', () => {
+    // Brevo requires sender.name to be absent or meaningful; an empty string
+    // is rejected as a validation error.
+    expect(parseSender('<a@b.co>')).toEqual({ name: undefined, email: 'a@b.co' });
+  });
+
+  it('handles a missing value without throwing', () => {
+    // SENDER_EMAIL always has a schema default, but the parser is used on
+    // whatever is configured and must not be the thing that crashes boot.
+    expect(() => parseSender()).not.toThrow();
+    expect(parseSender('')).toEqual({ email: '' });
+  });
+});
+
+describe('provider selection', () => {
+  it('is disabled under test regardless of configured credentials', () => {
+    // The guard that stops the suite sending live mail when a developer has
+    // real keys in .env — which is exactly the state this repo is in.
+    expect(mailProvider).toBe('disabled');
+  });
+
+  it('names every credential it looked for, so the log explains itself', () => {
+    const text = describeMailSetup();
+    expect(text).toMatch(/BREVO_API_KEY/);
+    expect(text).toMatch(/RESEND_API_KEY/);
+    expect(text).toMatch(/SMTP/);
   });
 });

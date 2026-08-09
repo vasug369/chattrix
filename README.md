@@ -11,7 +11,7 @@ A social platform combining microblogging with real-time messaging, built with R
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
 | Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
 | Validation | Zod (every endpoint) |
-| Testing    | Vitest + Supertest + mongodb-memory-server (161 tests) |
+| Testing    | Vitest + Supertest + mongodb-memory-server (169 tests) |
 | Database   | MongoDB Atlas |
 | Deployment | Frontend: Vercel · Backend: Render |
 
@@ -87,7 +87,7 @@ npm run dev        # Vite, port 5173
 
 ```bash
 cd backend
-npm test           # 161 integration tests, ~5s
+npm test           # 169 integration tests, ~5s
 npm run test:watch
 npm run test:coverage
 ```
@@ -248,7 +248,11 @@ Both `prefers-reduced-motion` (stops the drift) and a
   bundle asking every visitor's own machine for the API. Vite loads
   `.env.[mode]` only in that mode and it outranks `.env.local`, so this affects
   `npm run build` and leaves `npm run dev` alone.
-- **Mail goes through Resend's HTTPS API, not SMTP.** Managed hosts often
+- **Two mail providers are supported, both over HTTPS.** Resend can only
+  deliver to the account owner until a domain is verified; Brevo verifies a
+  single sender address instead, so it reaches any recipient without owning a
+  domain. `MAIL_PROVIDER` forces a choice when both are configured.
+- **Mail goes through an HTTPS API, not SMTP.** Managed hosts often
   filter outbound SMTP ports; that presents as an ~8s connection timeout rather
   than an auth error, and previously added that delay to every registration.
   Until a domain is verified at resend.com/domains, Resend accepts only
