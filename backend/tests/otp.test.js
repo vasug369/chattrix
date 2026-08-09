@@ -15,11 +15,18 @@ const captureOtp = () => {
   const spy = vi.spyOn(mailer, 'queueMail');
   return {
     spy,
+    /**
+     * Scans backwards for the most recent message that actually carries a
+     * code, rather than assuming the last one does. Registration queues a
+     * welcome email alongside the verification code, so "the last mail sent"
+     * and "the mail with the code in it" are no longer the same message.
+     */
     latest() {
-      const calls = spy.mock.calls;
-      if (!calls.length) return null;
-      const match = calls.at(-1)[0].text.match(/\b(\d{6})\b/);
-      return match?.[1] ?? null;
+      for (const call of [...spy.mock.calls].reverse()) {
+        const match = call[0].text?.match(/\b(\d{6})\b/);
+        if (match) return match[1];
+      }
+      return null;
     },
   };
 };
@@ -31,6 +38,41 @@ const registerUnverified = async (email = 'otp@example.com') => {
     .expect(201);
   return email;
 };
+
+describe('welcome email', () => {
+  it('sends one on registration, alongside the verification code', async () => {
+    const spy = vi.spyOn(mailer, 'queueMail');
+    await registerUnverified('welcome@example.com');
+
+    const sent = spy.mock.calls.map(([m]) => m).filter((m) => m.to === 'welcome@example.com');
+    const welcome = sent.find((m) => /welcome/i.test(m.subject));
+    const verify = sent.find((m) => /verify/i.test(m.subject));
+
+    expect(verify).toBeTruthy();
+    expect(welcome).toBeTruthy();
+    expect(welcome.html).toContain('Open Chattrix');
+    // A dead localhost link in every new user's inbox is the failure mode this
+    // guards against — see the APP_URL comment in env.js.
+    expect(welcome.html).toContain('https://');
+    expect(welcome.html).not.toContain('localhost');
+  });
+
+  it('escapes the display name so it cannot inject markup into the HTML body', async () => {
+    const spy = vi.spyOn(mailer, 'queueMail');
+    const email = 'xss@example.com';
+    await request(app)
+      .post('/api/auth/register')
+      .send({ name: '<img src=x onerror=alert(1)>', email, password: VALID_PASSWORD })
+      .expect(201);
+
+    const welcome = spy.mock.calls
+      .map(([m]) => m)
+      .find((m) => m.to === email && /welcome/i.test(m.subject));
+
+    expect(welcome.html).not.toContain('<img');
+    expect(welcome.html).toContain('&lt;img');
+  });
+});
 
 describe('email verification', () => {
   it('issues a code on registration and verifies with it', async () => {
