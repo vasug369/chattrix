@@ -162,7 +162,11 @@ export default function Dashboard() {
         )}
       </section>
 
-      <aside className="hidden flex-col gap-5 lg:flex">
+      {/* Previously `hidden ... lg:flex`, so this whole panel — including
+          Discover people — never rendered below the lg breakpoint, i.e. on
+          any phone. The single-column grid already stacks it under the feed
+          on small screens, so it just needs to actually display. */}
+      <aside className="flex flex-col gap-5">
         <GlassCard className="p-5">
           <div className="mb-4 flex items-center gap-3">
             <Avatar src={user?.pic} name={user?.name} size={46} />
