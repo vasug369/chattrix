@@ -6,6 +6,7 @@ import { Avatar, Button } from './ui/Glass';
 
 const LINKS = [
   { to: '/dashboard', label: 'Feed', icon: '🏠' },
+  { to: '/search', label: 'Search', icon: '🔍' },
   { to: '/create-post', label: 'Create', icon: '✏️' },
   { to: '/messages', label: 'Messages', icon: '💬' },
   { to: '/profile', label: 'Profile', icon: '👤' },
