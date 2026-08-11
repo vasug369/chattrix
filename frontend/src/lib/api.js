@@ -10,12 +10,35 @@ import axios from 'axios';
  */
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
+/**
+ * Empty means "same origin": requests go to /api on whatever host is serving
+ * the page, and vercel.json forwards them to the API.
+ *
+ * That indirection exists to keep the auth cookie first-party. Pointing the
+ * browser straight at chattrix-2.onrender.com made it a *third-party* cookie —
+ * structurally identical to an ad tracker's, and blocked on exactly the same
+ * rules. Incognito windows, Safari and every browser on iOS discard it, so
+ * POST /auth/login returned 200, the browser silently dropped the Set-Cookie,
+ * and the very next /user/me was a 401. Nothing errored anywhere; the
+ * credential just never survived the trip.
+ */
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,
-  // Auth is cookie-based, so every request must carry credentials.
+  // Auth is cookie-based, so every request must carry credentials. Still
+  // required same-origin: axios omits cookies without it.
   withCredentials: true,
   timeout: 20000,
 });
+
+/**
+ * Realtime cannot use the proxy: Vercel's rewrites do not carry WebSocket
+ * upgrades, so socket.io has to reach the API host directly. Its handshake
+ * therefore remains cross-site, and realtime stays unavailable wherever
+ * third-party cookies are blocked — see the note in the PR about moving
+ * socket auth to a short-lived ticket fetched over HTTP.
+ */
+export const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ?? (BASE_URL || 'http://localhost:3000');
 
 /** Where to send the user when their session turns out to be dead. */
 let onUnauthorized = () => {};

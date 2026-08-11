@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import api, { BASE_URL } from '../lib/api';
+import api, { SOCKET_URL } from '../lib/api';
 import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
@@ -32,7 +32,7 @@ export function SocketProvider({ children }) {
       return undefined;
     }
 
-    const s = io(BASE_URL, {
+    const s = io(SOCKET_URL, {
       query: { userId: user.id },
       withCredentials: true,
       transports: ['websocket', 'polling'],
