@@ -4,11 +4,15 @@ import {
     getAllUsersService,
     getPublicProfileService,
     isFollowingService,
+    removeAvatarService,
     searchUsersService,
     unfollowUserService,
+    updateAvatarService,
     updateUserService,
 } from '../services/userService.js';
+import { cloudinaryEnabled } from '../config/cloudinaryConfig.js';
 import { notify, removeNotification } from '../services/notificationService.js';
+import { badRequest } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const getMe = asyncHandler(async (req, res) => {
@@ -42,6 +46,28 @@ export const getUser = asyncHandler(async (req, res) => {
 export const updateMe = asyncHandler(async (req, res) => {
     const updated = await updateUserService(req.user._id, req.body);
     res.status(200).json({ success: true, data: updated });
+});
+
+/**
+ * Replace the signed-in user's profile photo with an uploaded file.
+ *
+ * multipart/form-data, field name `pic`. The image goes to Cloudinary, never
+ * to this server's disk — Render's filesystem is ephemeral, so anything
+ * written locally disappears on the next deploy or spin-down, taking every
+ * uploaded avatar with it.
+ */
+export const updateMyAvatar = asyncHandler(async (req, res) => {
+    // Checked before touching the file: without credentials multer falls back
+    // to memory storage, so the bytes would be accepted and silently dropped.
+    if (!cloudinaryEnabled) throw badRequest('Image uploads are not configured on this server');
+
+    const updated = await updateAvatarService(req.user._id, req.file);
+    res.status(200).json({ success: true, message: 'Profile photo updated', data: updated });
+});
+
+export const removeMyAvatar = asyncHandler(async (req, res) => {
+    const updated = await removeAvatarService(req.user._id);
+    res.status(200).json({ success: true, message: 'Profile photo removed', data: updated });
 });
 
 export const followUser = asyncHandler(async (req, res) => {

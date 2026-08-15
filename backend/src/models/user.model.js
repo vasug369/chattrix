@@ -68,6 +68,18 @@ const userSchema = new mongoose.Schema(
             default: ""
         },
 
+        // Cloudinary's identifier for the stored avatar, kept so the previous
+        // file can be deleted when a new one replaces it. Without it every
+        // change would orphan an image against a finite free quota.
+        //
+        // Empty for accounts whose picture came from Google rather than an
+        // upload — that URL is not ours to delete.
+        picPublicId: {
+            type: String,
+            default: "",
+            select: false,
+        },
+
         followers: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: "User"
@@ -109,6 +121,7 @@ userSchema.set("toJSON", {
         delete ret.resetOtpExpiry;
         delete ret.otpAttempts;
         delete ret.googleId;
+        delete ret.picPublicId;
         delete ret.__v;
         return ret;
     },

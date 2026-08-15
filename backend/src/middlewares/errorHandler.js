@@ -52,7 +52,10 @@ export const errorHandler = (err, req, res, next) => {
     message = 'Token expired';
   } else if (err.name === 'MulterError') {
     statusCode = 400;
-    message = err.code === 'LIMIT_FILE_SIZE' ? 'Image is too large (max 5MB)' : 'File upload failed';
+    if (err.code === 'LIMIT_FILE_SIZE') message = 'Image is too large (max 5MB)';
+    // Raised by the uploader's fileFilter, which knows exactly what was wrong.
+    else if (err.code === 'INVALID_FILE_TYPE') message = err.message;
+    else message = 'File upload failed';
   }
 
   // Unexpected failures get logged in full but reported generically.
