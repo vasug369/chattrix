@@ -79,7 +79,7 @@ const escapeHtml = (value = '') =>
  * but is not wired to a route), so welcoming people at verification time would
  * mean most accounts never receive one.
  */
-const welcomeEmail = (name) => {
+export const welcomeEmail = (name) => {
   const safeName = escapeHtml(name);
   return {
     subject: 'Welcome to Chattrix 👋',
@@ -156,6 +156,13 @@ export const loginUser = async ({ email, password }, req) => {
   // previous 'Invalid email' / 'Invalid password' split let anyone enumerate
   // which addresses have accounts.
   if (!user) throw unauthorized('Invalid email or password');
+
+  // A Google-only account has no stored hash. bcrypt.compare() rejects when
+  // given undefined, which would surface as a 500 on an ordinary typo. The
+  // message stays identical to the others on purpose: saying "this account
+  // uses Google" would turn login into an oracle for which addresses exist and
+  // how they signed up.
+  if (!user.password) throw unauthorized('Invalid email or password');
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw unauthorized('Invalid email or password');

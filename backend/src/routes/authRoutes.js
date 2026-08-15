@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     forgotPassword,
+    googleSignIn,
     listSessions,
     login,
     logout,
@@ -18,6 +19,7 @@ import { authLimiter, otpLimiter } from '../middlewares/rateLimiters.js';
 import { validate as validateRequest } from '../middlewares/validate.js';
 import {
     forgotPasswordSchema,
+    googleSignInSchema,
     loginSchema,
     registerSchema,
     resetPasswordSchema,
@@ -30,6 +32,10 @@ const authRouter = express.Router();
 
 authRouter.post('/register', authLimiter, validateRequest(registerSchema), register);
 authRouter.post('/login', authLimiter, validateRequest(loginSchema), login);
+// Google sign-in. Behind authLimiter like the other credential endpoints:
+// verifying an ID token is a signature check against Google's keys, and an
+// unbounded stream of them is free CPU burn for an attacker.
+authRouter.post('/google', authLimiter, validateRequest(googleSignInSchema), googleSignIn);
 authRouter.post('/logout', logout);
 authRouter.get('/validate', validate);
 authRouter.post('/refresh', authMiddleware, refresh);

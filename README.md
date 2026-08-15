@@ -146,6 +146,7 @@ All routes are under `/api`. Everything except `/api/auth/*` and
 |--------|------|---------|
 | POST | `/auth/register` | Create an account; sends a verification code |
 | POST | `/auth/login` | Sets httpOnly access + refresh cookies |
+| POST | `/auth/google` | Sign in/up with a Google ID token; same cookies as login |
 | POST | `/auth/logout` | Clears both cookies |
 | GET  | `/auth/validate` | Session probe |
 | POST | `/auth/refresh` | Rotate tokens |
@@ -156,6 +157,39 @@ All routes are under `/api`. Everything except `/api/auth/*` and
 | GET  | `/auth/sessions` | List active devices, flagging the current one |
 | DELETE | `/auth/sessions/:id` | Sign out one device |
 | DELETE | `/auth/sessions` | Sign out every *other* device |
+
+#### Google sign-in
+
+Optional. Unset `GOOGLE_CLIENT_ID` and the endpoint returns 403 while the
+frontend strips the button from the build entirely — nothing half-configured
+ever reaches a user.
+
+The frontend uses Google Identity Services, which yields a signed **ID token**.
+The server verifies it and issues its own session; Google is asked only "is
+this really this person?" and never becomes the thing keeping them logged in.
+This is not the authorization-code flow — that needs a client *secret* and a
+redirect round-trip to arrive at the same place, and we need no offline access
+to any Google API.
+
+Three rules the implementation depends on:
+
+- **Audience is pinned** to our client ID. Without that, a valid Google token
+  minted for *any other site* would be accepted here.
+- **Accounts match on `sub`**, Google's stable subject claim, not on email — an
+  address can change, and matching on it would orphan the account when it does.
+- **Unverified Google emails are refused.** Anyone can list an address they do
+  not own on a profile; linking on it would hand over the matching local
+  account.
+
+Signing up with a password and later using Google links the two on the same
+verified address rather than creating a duplicate. A Google-only account has no
+password stored, and password login for it fails with the same generic message
+as any other bad credential.
+
+To set it up: create an OAuth client ID (Web application) at
+<https://console.cloud.google.com/apis/credentials>, add your site to
+**Authorised JavaScript origins**, then set `GOOGLE_CLIENT_ID` on the backend
+and `VITE_GOOGLE_CLIENT_ID` on the frontend to that same value.
 
 ### Posts
 `POST /post/create` · `GET /post` · `GET /post/feed` · `GET /post/search?q=`

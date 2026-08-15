@@ -10,6 +10,7 @@ import {
     validateAccessToken,
     verifyEmailOtp,
 } from '../services/authService.js';
+import { signInWithGoogle } from '../services/googleAuthService.js';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import {
@@ -52,6 +53,36 @@ export const login = asyncHandler(async (req, res) => {
             email: user.email,
             pic: user.pic,
             isAccountVerified: user.isAccountVerified,
+        },
+    });
+});
+
+/**
+ * Sign in with Google.
+ *
+ * Ends in exactly the same place as password login — same cookies, same
+ * session row — so everything downstream (authMiddleware, the sessions list,
+ * remote sign-out) works without knowing which door the user came through.
+ */
+export const googleSignIn = asyncHandler(async (req, res) => {
+    const { user, token, refreshToken, isNewAccount } = await signInWithGoogle(
+        req.body.credential,
+        req
+    );
+
+    res.cookie('token', token, accessCookieOptions());
+    res.cookie('refreshToken', refreshToken, refreshCookieOptions());
+
+    res.status(isNewAccount ? 201 : 200).json({
+        success: true,
+        message: isNewAccount ? 'Account created with Google' : 'Logged in with Google',
+        data: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            pic: user.pic,
+            isAccountVerified: user.isAccountVerified,
+            isNewAccount,
         },
     });
 });
