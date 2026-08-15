@@ -22,8 +22,36 @@ const userSchema = new mongoose.Schema(
             // bcrypt hash around. Code that genuinely needs it (login, password
             // reset) must ask for it with .select('+password').
             type: String,
-            required: true,
+            // Required only for local accounts. A Google account has no
+            // password to store, and inventing a random one would be worse
+            // than absent: it would look like a usable credential to every
+            // future reader of this schema.
+            required: function required() {
+                return !this.googleId;
+            },
             select: false,
+        },
+
+        // Google's stable subject claim ("sub"), not the email — the email on a
+        // Google account can change, the subject cannot.
+        //
+        // `sparse` is essential: without it, the unique index would treat every
+        // local account's missing googleId as the same null and reject the
+        // second one.
+        googleId: {
+            type: String,
+            default: undefined,
+            unique: true,
+            sparse: true,
+            select: false,
+        },
+
+        // How this account can authenticate. An account created locally and
+        // later linked to Google carries both.
+        authProviders: {
+            type: [String],
+            enum: ['local', 'google'],
+            default: ['local'],
         },
         bio: {
             type: String,
@@ -80,6 +108,7 @@ userSchema.set("toJSON", {
         delete ret.resetOtp;
         delete ret.resetOtpExpiry;
         delete ret.otpAttempts;
+        delete ret.googleId;
         delete ret.__v;
         return ret;
     },

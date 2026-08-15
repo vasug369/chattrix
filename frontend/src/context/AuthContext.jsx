@@ -90,6 +90,21 @@ export function AuthProvider({ children }) {
     [loadUser]
   );
 
+  /**
+   * Exchange a Google credential for one of our sessions.
+   *
+   * Deliberately the same shape as login(): the server sets the same cookies
+   * either way, so everything after this point is identical regardless of how
+   * the user proved who they were.
+   */
+  const loginWithGoogle = useCallback(
+    async (credential) => {
+      await api.post('/auth/google', { credential });
+      return loadUser();
+    },
+    [loadUser]
+  );
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -114,10 +129,11 @@ export function AuthProvider({ children }) {
       // authorised by it.
       likelySignedIn,
       login,
+      loginWithGoogle,
       logout,
       refresh: loadUser,
     }),
-    [user, status, likelySignedIn, login, logout, loadUser]
+    [user, status, likelySignedIn, login, loginWithGoogle, logout, loadUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

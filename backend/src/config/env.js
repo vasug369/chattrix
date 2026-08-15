@@ -45,6 +45,15 @@ const envSchema = z.object({
       ].join(',')
     ),
 
+  // Google sign-in. Optional: without it the endpoint refuses politely and the
+  // frontend hides the button, rather than the server failing to boot.
+  //
+  // This is the OAuth *client ID*, which is public by design — it ships in the
+  // frontend bundle. It is not a secret, but it is still load-bearing: it is
+  // the `audience` every incoming Google ID token is checked against, which is
+  // what stops a token minted for some other site being replayed at ours.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+
   // Public address of the frontend, used for links inside emails. Deliberately
   // not derived from CORS_ORIGINS: that list is ordered for local development,
   // so its first entry is usually localhost — which would ship a dead link to
@@ -145,6 +154,7 @@ export const env = {
   // real email to whatever addresses the fixtures happen to use.
   resendEnabled: Boolean(raw.RESEND_API_KEY) && !isTest,
   brevoEnabled: Boolean(raw.BREVO_API_KEY) && !isTest,
+  googleAuthEnabled: Boolean(raw.GOOGLE_CLIENT_ID),
   cloudinaryEnabled: Boolean(
     raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET
   ),
