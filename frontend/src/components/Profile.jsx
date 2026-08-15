@@ -25,9 +25,20 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: '', bio: '', pic: '' });
+  const [draft, setDraft] = useState({ name: '', bio: '' });
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  // The chosen file plus a local object URL to preview it. The preview is
+  // revoked when it is replaced or the form closes — object URLs are held
+  // until the document unloads otherwise, which on this page means every
+  // photo the user auditions stays in memory.
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const [photoError, setPhotoError] = useState('');
+
+  const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+  const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
 
@@ -43,7 +54,7 @@ export default function Profile() {
       const p = profileRes.data.data;
       setProfile(p);
       setFollowing(Boolean(p.isFollowing));
-      setDraft({ name: p.name ?? '', bio: p.bio ?? '', pic: p.pic ?? '' });
+      setDraft({ name: p.name ?? '', bio: p.bio ?? '' });
       setPosts(postsRes.data.items);
     } catch (err) {
       setError(errorMessage(err, 'Could not load this profile'));
@@ -74,25 +85,80 @@ export default function Profile() {
     }
   };
 
+  /** Drop the preview URL as soon as it stops being shown. */
+  const clearPendingPhoto = useCallback(() => {
+    setPhotoPreview((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return '';
+    });
+    setPendingPhoto(null);
+    setPhotoError('');
+  }, []);
+
+  const choosePhoto = (e) => {
+    const file = e.target.files?.[0];
+    // Resetting the input means picking the *same* file again still fires a
+    // change event, which it otherwise would not after a failed attempt.
+    e.target.value = '';
+    if (!file) return;
+
+    // Checked here as well as on the server: a 5MB limit discovered only after
+    // uploading a 12MB photo over mobile data is a poor way to learn it.
+    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError('Choose a JPEG, PNG or WebP image.');
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('That image is larger than 5MB.');
+      return;
+    }
+
+    clearPendingPhoto();
+    setPendingPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const removePhoto = async () => {
+    setSaving(true);
+    try {
+      const { data } = await api.delete('/user/me/avatar');
+      setProfile((p) => ({ ...p, ...data.data }));
+      clearPendingPhoto();
+      await refresh();
+    } catch (err) {
+      setPhotoError(errorMessage(err, 'Could not remove the photo'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveProfile = async (e) => {
     e.preventDefault();
     setFormErrors({});
+    setPhotoError('');
     setSaving(true);
     try {
+      // The photo goes first and separately: it is multipart, and if it fails
+      // the name and bio should not silently save as though nothing happened.
+      if (pendingPhoto) {
+        const form = new FormData();
+        form.append('pic', pendingPhoto);
+        const { data } = await api.post('/user/me/avatar', form);
+        setProfile((p) => ({ ...p, ...data.data }));
+        clearPendingPhoto();
+      }
+
       // Only the fields the server accepts, and only ones that changed —
       // the endpoint rejects unknown keys outright.
       const payload = {};
       if (draft.name !== profile.name) payload.name = draft.name;
       if (draft.bio !== (profile.bio ?? '')) payload.bio = draft.bio;
-      if (draft.pic !== (profile.pic ?? '')) payload.pic = draft.pic;
 
-      if (Object.keys(payload).length === 0) {
-        setEditing(false);
-        return;
+      if (Object.keys(payload).length > 0) {
+        const { data } = await api.patch('/user/me', payload);
+        setProfile((p) => ({ ...p, ...data.data }));
       }
 
-      const { data } = await api.patch('/user/me', payload);
-      setProfile((p) => ({ ...p, ...data.data }));
       setEditing(false);
       await refresh();
     } catch (err) {
@@ -168,15 +234,58 @@ export default function Profile() {
               style={{ minHeight: '5rem', resize: 'vertical' }}
             />
 
-            <Field
-              id="input-profile-pic"
-              label="Profile picture URL"
-              type="url"
-              placeholder="https://…"
-              value={draft.pic}
-              onChange={(e) => setDraft((d) => ({ ...d, pic: e.target.value }))}
-              error={formErrors.pic}
-            />
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: 'var(--text-dim)' }}>
+                Profile photo
+              </span>
+
+              <div className="flex items-center gap-4">
+                <Avatar src={photoPreview || profile.pic} name={draft.name || profile.name} size={64} />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* The native control is hidden rather than styled: browsers
+                      barely allow styling it, and a label pointed at it is the
+                      accessible way to get a button that opens the picker. */}
+                  <input
+                    id="input-profile-photo"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={choosePhoto}
+                    className="sr-only"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => document.getElementById('input-profile-photo')?.click()}
+                  >
+                    {photoPreview ? 'Choose a different photo' : 'Choose photo'}
+                  </Button>
+
+                  {photoPreview && (
+                    <Button type="button" variant="ghost" onClick={clearPendingPhoto}>
+                      Discard
+                    </Button>
+                  )}
+
+                  {!photoPreview && profile.pic && (
+                    <Button type="button" variant="ghost" onClick={removePhoto} disabled={saving}>
+                      Remove photo
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {photoPreview
+                  ? 'Looks good — press Save changes to upload it.'
+                  : 'JPEG, PNG or WebP, up to 5MB. Cropped to a square.'}
+              </p>
+
+              {photoError && (
+                <p className="text-xs" style={{ color: 'var(--danger, #f87171)' }}>{photoError}</p>
+              )}
+            </div>
 
             <div className="flex gap-3">
               <Button type="submit" loading={saving}>Save changes</Button>
@@ -186,7 +295,8 @@ export default function Profile() {
                 onClick={() => {
                   setEditing(false);
                   setFormErrors({});
-                  setDraft({ name: profile.name, bio: profile.bio ?? '', pic: profile.pic ?? '' });
+                  clearPendingPhoto();
+                  setDraft({ name: profile.name, bio: profile.bio ?? '' });
                 }}
               >
                 Cancel
