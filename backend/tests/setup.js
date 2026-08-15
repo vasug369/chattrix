@@ -8,6 +8,9 @@ process.env.JWT_SECRET = 'test-access-secret-0123456789';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-0123456789';
 process.env.OTP_TTL_MINUTES = '10';
 process.env.OTP_MAX_ATTEMPTS = '5';
+// Turns on the Google sign-in route. No network call is ever made: the tests
+// replace the token verifier, so this only has to be non-empty.
+process.env.GOOGLE_CLIENT_ID = 'test-google-client-id.apps.googleusercontent.com';
 
 // One mongod for the whole run (see globalSetup.js), but a separate database
 // per test file: mongoose is a process-wide singleton, so sharing a database

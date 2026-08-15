@@ -48,3 +48,19 @@ export const resetPasswordSchema = {
 export const sessionIdSchema = {
   params: idParam,
 };
+
+/**
+ * Google hands the browser a compact JWS — three base64url segments separated
+ * by dots. Checking the shape here keeps obviously-malformed input from
+ * reaching the verifier, and bounds the length so an oversized body cannot be
+ * pushed through the signature check.
+ */
+export const googleSignInSchema = {
+  body: z.object({
+    credential: z
+      .string()
+      .min(20, 'Missing Google credential')
+      .max(4096, 'Google credential is implausibly large')
+      .regex(/^[\w-]+\.[\w-]+\.[\w-]+$/, 'Malformed Google credential'),
+  }),
+};

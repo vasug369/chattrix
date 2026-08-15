@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage, fieldErrors } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Banner, Button, Field } from './ui/Glass';
+import GoogleSignInButton, { googleSignInAvailable } from './GoogleSignInButton';
 
 const EMPTY = { name: '', email: '', password: '', confirmPassword: '' };
 
@@ -15,12 +16,33 @@ export default function Login() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading, likelySignedIn } = useAuth();
+  const { login, loginWithGoogle, isAuthenticated, isLoading, likelySignedIn } = useAuth();
 
   // Someone who is already signed in has no business on the login screen.
   useEffect(() => {
     if (isAuthenticated) navigate(location.state?.from ?? '/dashboard', { replace: true });
   }, [isAuthenticated, navigate, location.state]);
+
+  /**
+   * Google hands us a credential; the server turns it into one of our sessions.
+   *
+   * Ignores `mode` on purpose. Sign in and sign up are the same action here —
+   * the server creates the account if the address is new — so bouncing someone
+   * to the other tab to click an identical button would be pointless.
+   */
+  const handleGoogleCredential = async (credential) => {
+    setErrors({});
+    setBanner(null);
+    setLoading(true);
+    try {
+      await loginWithGoogle(credential);
+      navigate(location.state?.from ?? '/dashboard', { replace: true });
+    } catch (err) {
+      setBanner({ tone: 'error', text: errorMessage(err, 'Google sign-in failed') });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -191,6 +213,24 @@ export default function Login() {
             {isSignup ? 'Create account' : 'Sign in'}
           </Button>
         </form>
+
+        {googleSignInAvailable && (
+          <>
+            <div className="my-6 flex items-center gap-4">
+              <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+              <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+            </div>
+
+            <GoogleSignInButton
+              disabled={loading}
+              onCredential={handleGoogleCredential}
+              onError={() =>
+                setBanner({ tone: 'error', text: 'Could not load Google sign-in.' })
+              }
+            />
+          </>
+        )}
 
         <div className="my-6 flex items-center gap-4">
           <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
