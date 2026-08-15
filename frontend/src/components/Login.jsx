@@ -232,13 +232,24 @@ export default function Login() {
           </>
         )}
 
-        <div className="my-6 flex items-center gap-4">
-          <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
-          <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
-        </div>
+        {/* Only one rule above the mode switch. When the Google block is
+            present it brings its own, and a second one directly beneath it
+            read as an empty section. */}
+        {!googleSignInAvailable && (
+          <div className="my-6 flex items-center gap-4">
+            <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+            <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+          </div>
+        )}
 
-        <Button id="btn-toggle-mode" type="button" variant="ghost" onClick={switchMode} className="w-full">
+        <Button
+          id="btn-toggle-mode"
+          type="button"
+          variant="ghost"
+          onClick={switchMode}
+          className={googleSignInAvailable ? 'mt-6 w-full' : 'w-full'}
+        >
           {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
         </Button>
       </div>

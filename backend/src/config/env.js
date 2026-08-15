@@ -155,9 +155,15 @@ export const env = {
   resendEnabled: Boolean(raw.RESEND_API_KEY) && !isTest,
   brevoEnabled: Boolean(raw.BREVO_API_KEY) && !isTest,
   googleAuthEnabled: Boolean(raw.GOOGLE_CLIENT_ID),
-  cloudinaryEnabled: Boolean(
-    raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET
-  ),
+  // Same `!isTest` guard as the mail providers, and for the same reason:
+  // dotenv loads the developer's .env even under NODE_ENV=test, so the suite
+  // was configuring multer's Cloudinary storage with real credentials and
+  // uploading test fixtures to a live account. It surfaced only because those
+  // keys have since been rotated — "Unknown API key" as an unhandled rejection
+  // during a test run. With valid keys it would have quietly worked.
+  cloudinaryEnabled:
+    Boolean(raw.CLOUDINARY_CLOUD_NAME && raw.CLOUDINARY_API_KEY && raw.CLOUDINARY_API_SECRET) &&
+    !isTest,
 };
 
 export default env;
