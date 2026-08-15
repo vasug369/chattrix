@@ -4,6 +4,7 @@ import User from "../models/user.model.js";
 import Notification from "../models/notification.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
+import { destroyImage } from "../config/cloudinaryConfig.js";
 import { badRequest, notFound } from "../utils/AppError.js";
 import { escapeRegex } from "../utils/sanitize.js";
 
@@ -51,6 +52,52 @@ export const updateUserService = async (userId, data) => {
         runValidators: true,
     }).select(PUBLIC_FIELDS);
     if (!user) throw notFound("User not found");
+    return user;
+};
+
+/**
+ * Replace the signed-in user's avatar with a freshly uploaded image.
+ *
+ * The file has already reached Cloudinary by this point — multer's storage
+ * engine streams it there before the handler runs — so `file.path` is the
+ * delivered URL and `file.filename` is Cloudinary's public id.
+ */
+export const updateAvatarService = async (userId, file) => {
+    if (!file?.path) throw badRequest("No image was uploaded");
+
+    const user = await User.findById(userId).select(`${PUBLIC_FIELDS} +picPublicId`);
+    if (!user) throw notFound("User not found");
+
+    const previousPublicId = user.picPublicId;
+
+    user.pic = file.path;
+    user.picPublicId = file.filename ?? "";
+    await user.save();
+
+    // After the save, and not awaited: the new avatar is already stored, and
+    // tidying up the old one must not delay the response or fail the request.
+    if (previousPublicId && previousPublicId !== user.picPublicId) {
+        void destroyImage(previousPublicId);
+    }
+
+    return user;
+};
+
+/** Clear the avatar, deleting the stored file if we own one. */
+export const removeAvatarService = async (userId) => {
+    const user = await User.findById(userId).select(`${PUBLIC_FIELDS} +picPublicId`);
+    if (!user) throw notFound("User not found");
+
+    const previousPublicId = user.picPublicId;
+
+    user.pic = "";
+    user.picPublicId = "";
+    await user.save();
+
+    // Only ever deletes our own uploads. A picture that came from Google has
+    // no public id recorded, so there is nothing here to destroy.
+    if (previousPublicId) void destroyImage(previousPublicId);
+
     return user;
 };
 

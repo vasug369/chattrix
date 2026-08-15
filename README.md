@@ -204,6 +204,27 @@ Edit and delete require ownership. All list endpoints are paginated
 `GET /user/me` · `PATCH /user/me` · `DELETE /user/me` · `GET /user/getAllUsers`
 · `GET /user/search?q=` · `GET /user/:id` · `GET /user/is-following/:id`
 · `PUT /user/:id/follow` · `PUT /user/:id/unfollow`
+· `POST /user/me/avatar` · `DELETE /user/me/avatar`
+
+#### Profile photos
+
+Uploaded as `multipart/form-data` (field `pic`) to `POST /user/me/avatar`, and
+stored in **Cloudinary**, never on the API server. That is not a preference:
+Render's filesystem is ephemeral, so anything written to disk vanishes on the
+next deploy or spin-down, taking every avatar with it.
+
+JPEG/PNG/WebP, 5MB max, cropped to a 512×512 square on upload — an avatar sits
+beside every post and comment, so shipping a 4MB phone photo to be scaled down
+by the browser wastes bandwidth on every screen it appears on.
+
+Cloudinary's public id is stored alongside the URL so replacing a photo deletes
+the previous file; without it each change would orphan an image against a
+finite free quota. Pictures that came from Google sign-in have no public id
+recorded and are never deleted — that file is not ours.
+
+`PATCH /user/me` no longer accepts `pic`. It used to take a free-text URL,
+which let an avatar point at any host, whose contents could be changed
+afterwards.
 
 ### Messages & Notifications
 `GET /messages/users` · `GET /messages/:id` · `POST /messages/send/:id`
