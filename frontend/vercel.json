@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://chattrix-2.onrender.com/api/:path*"
+      "destination": "https://api.chattrix.online/api/:path*"
     },
     {
       "source": "/(.*)",
