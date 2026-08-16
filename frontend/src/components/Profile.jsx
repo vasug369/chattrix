@@ -334,14 +334,34 @@ export default function Profile() {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant={following ? 'ghost' : 'primary'}
-                    loading={followBusy}
-                    onClick={toggleFollow}
-                  >
-                    {following ? 'Following' : 'Follow'}
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        navigate('/messages', {
+                          state: {
+                            contact: {
+                              _id: profile._id,
+                              name: profile.name,
+                              pic: profile.pic,
+                              bio: profile.bio,
+                            },
+                          },
+                        })
+                      }
+                    >
+                      Message
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={following ? 'ghost' : 'primary'}
+                      loading={followBusy}
+                      onClick={toggleFollow}
+                    >
+                      {following ? 'Following' : 'Follow'}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

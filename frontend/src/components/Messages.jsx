@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -10,6 +11,8 @@ const formatTime = (iso) =>
 export default function Messages() {
   const { user } = useAuth();
   const { socket, isOnline } = useSocket();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -70,6 +73,17 @@ export default function Messages() {
       setLoadingThread(false);
     }
   }, []);
+
+  // Arriving here from a profile's "Message" button: open a thread with
+  // that person even though they have no conversation (and therefore no
+  // sidebar entry) yet. Clearing the state afterwards means a page refresh
+  // or the back button doesn't keep re-opening it.
+  useEffect(() => {
+    const contact = location.state?.contact;
+    if (!contact) return;
+    openThread(contact);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, location.pathname, navigate, openThread]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -146,6 +160,14 @@ export default function Messages() {
     try {
       const { data } = await api.post(`/messages/send/${selected._id}`, { message: text });
       setMessages((prev) => [...prev, data.data]);
+      // First message to someone new: they won't be in the sidebar yet
+      // (the list only reflects existing conversations), so add them
+      // locally instead of waiting for a refetch.
+      setContacts((prev) =>
+        prev.some((c) => c._id === selected._id)
+          ? prev
+          : [{ ...selected, unreadCount: 0 }, ...prev]
+      );
     } catch (err) {
       setError(errorMessage(err, 'Message not sent'));
       setDraft(text); // give the text back rather than losing it
@@ -196,8 +218,8 @@ export default function Messages() {
             ))}
 
           {!loadingContacts && !visibleContacts.length && (
-            <EmptyState icon="👥" title="Nobody here yet">
-              Other people who sign up will show up in this list.
+            <EmptyState icon="👥" title="No conversations yet">
+              Visit someone's profile and tap Message to start one.
             </EmptyState>
           )}
 

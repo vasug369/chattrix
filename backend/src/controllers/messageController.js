@@ -85,7 +85,18 @@ export const getMessages = asyncHandler(async (req, res) => {
 export const getUsersForSidebar = asyncHandler(async (req, res) => {
     const myId = req.user._id;
 
-    const users = await User.find({ _id: { $ne: myId } })
+    // Only people we've actually exchanged a message with — this used to
+    // return every user on the platform, which made "Messages" a directory
+    // of the whole userbase instead of an inbox. Starting a first-ever
+    // conversation now happens from a profile's Message button instead.
+    const conversations = await Conversation.find({ participants: myId })
+        .select('participants')
+        .lean();
+    const otherIds = conversations
+        .map((c) => c.participants.find((p) => p.toString() !== myId.toString()))
+        .filter(Boolean);
+
+    const users = await User.find({ _id: { $in: otherIds } })
         .select('name pic bio')
         .lean();
 
