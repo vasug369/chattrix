@@ -106,10 +106,13 @@ describe('read receipts', () => {
 });
 
 describe('conversation sidebar', () => {
-  it('lists other users with per-conversation unread counts', async () => {
+  it('lists only users with an existing conversation, with per-conversation unread counts', async () => {
     const me = await createUser();
     const chatty = await createUser({ name: 'Chatty' });
-    const quiet = await createUser({ name: 'Quiet' });
+    // Never exchanged a message with `me` in either direction — must not
+    // appear. The sidebar is an inbox of real conversations, not a
+    // directory of every registered user.
+    await createUser({ name: 'Quiet' });
 
     await chatty.agent.post(`/api/messages/send/${me.id}`).send({ message: 'one' }).expect(201);
     await chatty.agent.post(`/api/messages/send/${me.id}`).send({ message: 'two' }).expect(201);
@@ -119,7 +122,17 @@ describe('conversation sidebar', () => {
 
     expect(res.body.items.map((u) => u._id)).not.toContain(me.id);
     expect(byName.Chatty.unreadCount).toBe(2);
-    expect(byName.Quiet.unreadCount).toBe(0);
+    expect(byName.Quiet).toBeUndefined();
+  });
+
+  it('includes a conversation I started even before the other side replies', async () => {
+    const me = await createUser();
+    const them = await createUser({ name: 'Them' });
+
+    await me.agent.post(`/api/messages/send/${them.id}`).send({ message: 'hi' }).expect(201);
+
+    const res = await me.agent.get('/api/messages/users').expect(200);
+    expect(res.body.items.map((u) => u.name)).toContain('Them');
   });
 
   it('clears the unread badge once the thread is opened', async () => {

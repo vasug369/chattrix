@@ -141,9 +141,13 @@ describe('user data exposure', () => {
 
   it('never leaks secrets through the messages sidebar', async () => {
     const { agent } = await createUser();
-    await createUser();
+    const other = await createUser();
+    // The sidebar only lists existing conversations, so one has to exist
+    // for this check to actually exercise anything.
+    await agent.post(`/api/messages/send/${other.id}`).send({ message: 'hi' }).expect(201);
 
     const res = await agent.get('/api/messages/users').expect(200);
+    expect(res.body.items.length).toBeGreaterThan(0);
     for (const user of res.body.items) {
       expect(user).not.toHaveProperty('password');
     }
