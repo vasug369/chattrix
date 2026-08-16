@@ -40,9 +40,22 @@ jobs:
 
             pm2 restart chattrix-backend --update-env
 
-            # Give it a moment to boot, then prove it's actually serving
-            # before declaring the deploy a success. If the app is
-            # crash-looping (bad env var, missing dep, etc.) this fails the
-            # GitHub Actions run instead of leaving production silently down.
-            sleep 3
-            curl -fsS http://127.0.0.1:3000/api/health
+            # Prove it's actually serving before declaring the deploy a
+            # success — but don't guess a fixed wait. server.js connects to
+            # MongoDB Atlas *before* it opens the port, and a cold
+            # post-restart connection to Atlas routinely takes longer than a
+            # flat sleep would allow, which was failing this check even on
+            # perfectly healthy deploys. Poll instead: up to 20 tries, 1s
+            # apart, so a normal boot passes in a couple of seconds and only
+            # a real crash (missing dep, bad env var, etc.) burns the full
+            # budget and fails the run.
+            for i in $(seq 1 20); do
+              if curl -fsS http://127.0.0.1:3000/api/health; then
+                echo "Healthy after ${i}s"
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "App did not become healthy within 20s — deploy failed"
+            pm2 logs chattrix-backend --lines 30 --nostream
+            exit 1
