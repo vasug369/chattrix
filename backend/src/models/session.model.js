@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
  * "sign out my old phone". Tokens now carry a `jti` that points here, so a
  * single session can be revoked without disturbing the others.
  *
- * The trade-off is a database lookup per authenticated request. That is
+ * The trade-off is a database lookup per authenticated request. That is .
  * acceptable because the request already loads the User document to authorise
  * itself, so this is a second indexed read rather than a first one.
  */
