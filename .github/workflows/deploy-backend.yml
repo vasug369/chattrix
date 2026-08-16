@@ -1,0 +1,48 @@
+name: Deploy backend to EC2
+
+# Runs whenever backend code lands on main. Frontend needs nothing here —
+# Vercel already redeploys on push via its own GitHub integration.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH in and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd ~/chattrix
+
+            # Hard reset to origin/main rather than a plain pull — guarantees
+            # the server ends up byte-for-byte what's on GitHub, even if
+            # someone ever hand-edits a file on the box again.
+            git fetch origin main
+            git reset --hard origin/main
+
+            cd backend
+            # npm ci, not npm install: installs exactly what package-lock.json
+            # pins, and fails loudly on a lockfile/package.json mismatch
+            # instead of silently leaving a dependency missing (see: today's
+            # google-auth-library crash loop).
+            npm ci --omit=dev
+
+            pm2 restart chattrix-backend --update-env
+
+            # Give it a moment to boot, then prove it's actually serving
+            # before declaring the deploy a success. If the app is
+            # crash-looping (bad env var, missing dep, etc.) this fails the
+            # GitHub Actions run instead of leaving production silently down.
+            sleep 3
+            curl -fsS http://127.0.0.1:3000/api/health
