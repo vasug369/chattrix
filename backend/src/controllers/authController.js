@@ -150,11 +150,13 @@ export const revokeSession = asyncHandler(async (req, res) => {
 });
 
 export const revokeOtherSessions = asyncHandler(async (req, res) => {
-    const { revoked } = await revokeOtherSessionsService(req.user._id, req.session?.jti);
+    const { revoked, devices } = await revokeOtherSessionsService(req.user._id, req.session?.jti);
     res.status(200).json({
         success: true,
-        message: revoked === 1 ? 'Signed out 1 other device' : `Signed out ${revoked} other devices`,
-        data: { revoked },
+        // Counts devices, not sessions: the list shows one row per device, and
+        // a device can hold several sessions.
+        message: devices === 1 ? 'Signed out 1 other device' : `Signed out ${devices} other devices`,
+        data: { revoked, devices },
     });
 });
 
