@@ -33,6 +33,20 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL: z.string().default('7d'),
 
+  /**
+   * Parent domain the auth cookies belong to, e.g. `.chattrix.online`.
+   *
+   * Without it the cookie is host-only: set via the frontend's /api proxy it
+   * scopes to chattrix.online alone, and is therefore NOT sent to
+   * api.chattrix.online. HTTP still works (it goes through the proxy), but the
+   * Socket.io handshake addresses the API host directly, arrives with no
+   * cookie, and is rejected — presence and live messages die silently while
+   * everything else looks fine.
+   *
+   * Leave unset for localhost, where the frontend and API share a host.
+   */
+  COOKIE_DOMAIN: z.string().optional(),
+
   CORS_ORIGINS: z
     .string()
     .default(
