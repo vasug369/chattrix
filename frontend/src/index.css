@@ -342,6 +342,45 @@ body {
   box-shadow: var(--shadow-lifted), 0 0 24px -14px var(--accent-glow);
 }
 
+/* Nav bar links: a quick, tactile "pop" on hover. Distinct from
+   .glass-hover's restrained 1px lift above — that restraint exists because
+   the mouse crosses large feed cards incidentally, where a bigger movement
+   reads as heaving. Nav links are small, deliberate targets the user is
+   actually aiming for, so a more noticeable scale-up reads as responsive
+   rather than jumpy. Reduced-motion is already handled globally (see the
+   prefers-reduced-motion block below), so no extra guard is needed here. */
+.nav-pop {
+  /* Lists every property that changes, because the element no longer carries
+     Tailwind's `transition-all duration-300`. That utility emitted later in
+     the sheet at equal specificity, so it silently overrode this rule and the
+     pop ran at 300ms with Tailwind's default easing — twice the intended
+     duration, which read as lag rather than response. The colour and border
+     transitions below are the ones `transition-all` used to cover for the
+     active-link state. */
+  transition:
+    transform 0.15s var(--ease-out),
+    box-shadow 0.15s var(--ease-out),
+    background-color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    color 0.2s var(--ease-out);
+}
+
+/* Hover only where hovering is real. A touch browser latches :hover after a
+   tap, so without this guard a tapped nav link stayed scaled up until the
+   user happened to tap somewhere else. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-pop:hover {
+    transform: translateY(-2px) scale(1.06);
+    box-shadow: 0 10px 22px -12px var(--accent-glow);
+  }
+}
+
+/* Deliberately outside the media query: press feedback is wanted on touch
+   too, and :active does not latch. */
+.nav-pop:active {
+  transform: translateY(0) scale(0.96);
+}
+
 /* Glowing ring for the active/featured state. */
 .glass-ring {
   box-shadow:

@@ -29,11 +29,25 @@ export default function NavBar() {
     navigate('/');
   };
 
-  const linkClass = ({ isActive }) =>
-    [
-      'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300',
-      isActive ? 'text-white' : 'hover:text-white',
-    ].join(' ');
+  /**
+   * `pop` is off for the mobile menu on purpose: those links are full-width
+   * rows, and scaling one up 6% pushes it ~9px past each edge of a panel with
+   * 8px of padding. The scale reads as a button growing; on a full-width row
+   * it just looks like a layout glitch.
+   *
+   * No `transition-all duration-300` here either — it emits after .nav-pop at
+   * equal specificity and overrode its timing. .nav-pop now declares every
+   * transition it needs, including the colour and border changes for the
+   * active state that transition-all used to cover.
+   */
+  const linkClass =
+    (pop) =>
+    ({ isActive }) =>
+      [
+        pop ? 'nav-pop' : 'transition-colors duration-200',
+        'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium',
+        isActive ? 'text-white' : 'hover:text-white',
+      ].join(' ');
 
   const linkStyle = ({ isActive }) => ({
     background: isActive ? 'rgba(139,92,246,0.18)' : 'transparent',
@@ -57,7 +71,7 @@ export default function NavBar() {
 
         <div className="hidden flex-1 items-center gap-1 md:flex">
           {LINKS.map((l) => (
-            <NavLink key={l.to} to={l.to} className={linkClass} style={linkStyle}>
+            <NavLink key={l.to} to={l.to} className={linkClass(true)} style={linkStyle}>
               <span aria-hidden="true">{l.icon}</span>
               {l.label}
             </NavLink>
@@ -106,7 +120,7 @@ export default function NavBar() {
               key={l.to}
               to={l.to}
               onClick={() => setMenuOpen(false)}
-              className={linkClass}
+              className={linkClass(false)}
               style={linkStyle}
             >
               <span aria-hidden="true">{l.icon}</span>
