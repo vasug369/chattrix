@@ -10,7 +10,7 @@ import {
     updateAvatarService,
     updateUserService,
 } from '../services/userService.js';
-import { cookieBase } from '../services/authService.js';
+import { clearLegacyHostOnlyCookies, cookieBase } from '../services/authService.js';
 import { cloudinaryEnabled } from '../config/cloudinaryConfig.js';
 import { notify, removeNotification } from '../services/notificationService.js';
 import { badRequest } from '../utils/AppError.js';
@@ -116,6 +116,7 @@ export const deleteMe = asyncHandler(async (req, res) => {
     const options = cookieBase();
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
+    clearLegacyHostOnlyCookies(res);
     res.status(200).json({ success: true, message: 'Account deleted' });
 });
 
