@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import ProfileDrawer from './ProfileDrawer';
 import { Avatar, Banner, Button, EmptyState, GlassCard, Skeleton } from './ui/Glass';
 
 const formatTime = (iso) =>
@@ -25,6 +26,7 @@ export default function Messages() {
   const [search, setSearch] = useState('');
   const [peerTyping, setPeerTyping] = useState(false);
   const [showSidebarOnMobile, setShowSidebarOnMobile] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const bottomRef = useRef(null);
   const typingTimer = useRef(null);
@@ -56,6 +58,9 @@ export default function Messages() {
     setSelected(contact);
     setShowSidebarOnMobile(false);
     setPeerTyping(false);
+    // Otherwise the panel stays open showing the previous person while the
+    // thread underneath switches to someone else.
+    setProfileOpen(false);
     setLoadingThread(true);
     setError('');
     try {
@@ -292,12 +297,16 @@ export default function Messages() {
               >
                 ←
               </button>
-              {/* The whole identity block is the link, matching the rest of
-                  the app (PostCard links its author the same way) and giving
-                  a target big enough to hit on a phone. */}
-              <Link
-                to={`/profile/${selected._id}`}
-                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 -m-1 transition-colors hover:bg-white/5"
+              {/* Opens the profile beside the thread rather than navigating:
+                  checking who you are talking to should not unmount the
+                  conversation. The whole identity block is the target, which
+                  is both the convention and a big enough hit area on a phone. */}
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={profileOpen}
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl p-1 -m-1 text-left transition-colors hover:bg-white/5"
                 title={`View ${selected.name}'s profile`}
               >
                 <Avatar src={selected.pic} name={selected.name} size={40} />
@@ -307,7 +316,7 @@ export default function Messages() {
                     {peerTyping ? 'typing…' : isOnline(selected._id) ? 'Online' : 'Offline'}
                   </p>
                 </div>
-              </Link>
+              </button>
             </header>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -412,6 +421,14 @@ export default function Messages() {
           </>
         )}
       </GlassCard>
+
+      {profileOpen && selected && (
+        <ProfileDrawer
+          userId={selected._id}
+          fallback={selected}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
     </div>
   );
 }
