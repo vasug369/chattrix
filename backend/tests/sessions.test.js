@@ -58,6 +58,41 @@ describe('session inventory', () => {
     expect(sessions).toHaveLength(2);
   });
 
+  it('collapses repeat sign-ins from one device into a single row', async () => {
+    const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36';
+    const { agent, id, payload } = await createUser();
+
+    // Signing in again from the same browser is the ordinary case — nothing
+    // but an explicit logout retires the previous row.
+    await loginWith(payload, UA);
+    await loginWith(payload, UA);
+
+    // Three rows in the collection: the one createUser opened under
+    // supertest's own user agent, plus the two below.
+    const stored = await Session.find({ user: id, revokedAt: null });
+    expect(stored).toHaveLength(3);
+
+    const res = await agent.get('/api/auth/sessions').expect(200);
+    const linux = res.body.data.filter((s) => s.device === 'Chrome on Linux');
+
+    // Two sessions from the same browser, collapsed to one row.
+    expect(linux).toHaveLength(1);
+    expect(linux[0].sessionCount).toBe(2);
+  });
+
+  it('reports the earliest sign-in as the group first-seen time', async () => {
+    const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36';
+    const { agent, payload } = await createUser();
+    await loginWith(payload, UA);
+
+    const res = await agent.get('/api/auth/sessions').expect(200);
+    const group = res.body.data.find((s) => s.device === 'Chrome on Linux');
+
+    expect(new Date(group.firstSeenAt).getTime()).toBeLessThanOrEqual(
+      new Date(group.lastSeenAt).getTime()
+    );
+  });
+
   it('labels the device from the user agent', async () => {
     const { payload } = await createUser();
     await loginWith(
@@ -87,6 +122,30 @@ describe('remote sign-out', () => {
     // The revoked device still holds syntactically valid tokens. They must
     // stop working anyway, or the button is decorative.
     await request(app).get('/api/user/me').set('Cookie', other.cookies).expect(401);
+    await agent.get('/api/user/me').expect(200);
+  });
+
+  it('revoking a collapsed row signs out every session behind it', async () => {
+    const UA = 'Mozilla/5.0 (Linux; Android 14) Chrome/120.0 Mobile Safari/537.36';
+    const { agent, payload } = await createUser();
+
+    // Two sign-ins from one phone: one row in the list, two live sessions.
+    const first = await loginWith(payload, UA);
+    const second = await loginWith(payload, UA);
+
+    await request(app).get('/api/user/me').set('Cookie', first.cookies).expect(200);
+    await request(app).get('/api/user/me').set('Cookie', second.cookies).expect(200);
+
+    const list = await agent.get('/api/auth/sessions').expect(200);
+    const phone = list.body.data.find((s) => s.device === 'Chrome on Android');
+    expect(phone.sessionCount).toBe(2);
+
+    await agent.delete(`/api/auth/sessions/${phone.id}`).expect(200);
+
+    // Revoking only the representative session would leave the other one
+    // working, so the row would reappear and the button would look broken.
+    await request(app).get('/api/user/me').set('Cookie', first.cookies).expect(401);
+    await request(app).get('/api/user/me').set('Cookie', second.cookies).expect(401);
     await agent.get('/api/user/me').expect(200);
   });
 
