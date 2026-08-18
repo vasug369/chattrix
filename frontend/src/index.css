@@ -398,6 +398,9 @@ body {
   font-weight: 600;
   color: #fff;
   cursor: pointer;
+  /* The class is used on <a> as well as <button> (the drawer's "View full
+     profile"), where the browser would otherwise underline it. */
+  text-decoration: none;
   background: var(--accent-gradient);
   background-size: 200% 200%;
   transition:
@@ -467,6 +470,68 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 0.5rem;
+}
+
+/* ============================================================
+   4b. DRAWER
+   A side panel for reference content shown alongside the thing it
+   describes — currently the profile opened from a conversation.
+
+   Desktop: anchored to the right edge, the conversation still visible
+   and undimmed beside it, as in WhatsApp Web and Slack. The scrim is
+   present but transparent: it exists to catch the click-outside, not
+   to dim anything.
+
+   Mobile: the same panel fills the screen, because there is no room to
+   show both. That matches the full-screen push those apps use on a
+   phone, and it means one component covers both cases.
+   ============================================================ */
+
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+}
+
+.drawer-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  animation: drawerInMobile 0.22s var(--ease-out) both;
+}
+
+@media (min-width: 768px) {
+  .drawer-scrim {
+    /* Barely-there tint. Enough to signal the panel has focus, not enough
+       to hide the conversation the user is checking against. */
+    background: rgba(4, 2, 12, 0.35);
+  }
+
+  .drawer-panel {
+    inset: 0 0 0 auto;
+    width: 380px;
+    max-width: 92vw;
+    border-radius: 20px 0 0 20px;
+    border-right: none;
+    animation: drawerIn 0.22s var(--ease-out) both;
+  }
+}
+
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes drawerInMobile {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================
