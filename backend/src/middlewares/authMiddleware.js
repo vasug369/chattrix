@@ -2,14 +2,12 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import User from '../models/user.model.js';
 import { unauthorized } from '../utils/AppError.js';
+import { accessCookieOptions } from '../services/authService.js';
 import { findLiveSession, touchSession } from '../services/sessionService.js';
 
-const accessCookieOptions = () => ({
-  httpOnly: true,
-  secure: env.isProduction,
-  sameSite: env.isProduction ? 'None' : 'Lax',
-  maxAge: 15 * 60 * 1000,
-});
+// The options used to be redeclared here, which is how the refreshed cookie
+// ended up without the Domain attribute the login cookie had: a silent
+// re-scoping halfway through a session. One definition, in authService.
 
 /**
  * Authenticate via the access-token cookie, transparently refreshing it when
