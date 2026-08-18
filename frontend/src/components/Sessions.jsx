@@ -164,6 +164,11 @@ export default function Sessions() {
               </div>
               <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
                 {formatIp(s.ip)} · active {relativeTime(s.lastSeenAt)}
+                {/* One row is one device, but a device accumulates a session
+                    per login. Saying so explains a number the user would
+                    otherwise have to guess at, and makes clear why revoking
+                    this row signs out more than one. */}
+                {s.sessionCount > 1 && ` · ${s.sessionCount} sign-ins`}
               </p>
             </div>
 
