@@ -16,12 +16,16 @@ import { createSession, revokeAllSessionsService } from './sessionService.js';
  * the controller try to send a second one.
  */
 
-const cookieBase = () => ({
+export const cookieBase = () => ({
   httpOnly: true,
   secure: env.isProduction,
   // Cross-site cookies (Vercel frontend -> Render API) require SameSite=None,
   // which browsers only honour alongside Secure.
   sameSite: env.isProduction ? 'None' : 'Lax',
+  // Shares the cookie with every subdomain of the parent, so the socket
+  // handshake against api.<domain> carries it. Omitted entirely when unset —
+  // passing `domain: undefined` is fine, but an empty string is not.
+  ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
 });
 
 export const accessCookieOptions = () => ({ ...cookieBase(), maxAge: 15 * 60 * 1000 });

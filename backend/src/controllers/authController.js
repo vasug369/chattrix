@@ -1,5 +1,6 @@
 import {
     accessCookieOptions,
+    cookieBase,
     issueTokens,
     loginUser,
     refreshCookieOptions,
@@ -101,7 +102,7 @@ export const logout = asyncHandler(async (req, res) => {
 
     // The refresh cookie was never cleared, so "logging out" left a token that
     // silently minted a new session on the next request.
-    const options = { httpOnly: true, secure: accessCookieOptions().secure, sameSite: accessCookieOptions().sameSite };
+    const options = cookieBase();
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
     res.status(200).json({ success: true, message: 'Logged out' });
@@ -134,7 +135,7 @@ export const revokeSession = asyncHandler(async (req, res) => {
     // If a user revokes the device they are currently using, treat it as a
     // logout rather than leaving them holding cookies that no longer work.
     if (req.session && String(session._id) === String(req.session._id)) {
-        const options = { httpOnly: true, secure: accessCookieOptions().secure, sameSite: accessCookieOptions().sameSite };
+        const options = cookieBase();
         res.clearCookie('token', options);
         res.clearCookie('refreshToken', options);
     }
@@ -202,7 +203,7 @@ export const performPasswordReset = asyncHandler(async (req, res) => {
     await resetPassword(req.body);
     // The reset bumped tokenVersion; drop this browser's cookies too so the
     // user is forced through a clean login.
-    const options = { httpOnly: true, secure: accessCookieOptions().secure, sameSite: accessCookieOptions().sameSite };
+    const options = cookieBase();
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
     res.status(200).json({ success: true, message: 'Password reset successfully. Please sign in.' });
