@@ -8,7 +8,7 @@ import axios from 'axios';
  * local build silently talked to production. The base URL now comes from
  * VITE_API_BASE_URL with a localhost default.
  */
-export const BASE_URL = 'http://localhost:3000';
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
 /**
  * Empty means "same origin": requests go to /api on whatever host is serving
@@ -41,7 +41,7 @@ export const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ?? (BASE_URL || 'http://localhost:3000');
 
 /** Where to send the user when their session turns out to be dead. */
-let onUnauthorized = () => { };
+let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn) => {
   onUnauthorized = fn;
 };
