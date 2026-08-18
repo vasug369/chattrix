@@ -10,6 +10,7 @@ import {
     updateAvatarService,
     updateUserService,
 } from '../services/userService.js';
+import { cookieBase } from '../services/authService.js';
 import { cloudinaryEnabled } from '../config/cloudinaryConfig.js';
 import { notify, removeNotification } from '../services/notificationService.js';
 import { badRequest } from '../utils/AppError.js';
@@ -109,8 +110,12 @@ export const isFollowing = asyncHandler(async (req, res) => {
 
 export const deleteMe = asyncHandler(async (req, res) => {
     await deleteUserService(req.user._id);
-    res.clearCookie('token');
-    res.clearCookie('refreshToken');
+    // clearCookie only matches a cookie whose attributes it repeats. Called
+    // bare, it cleared nothing in production — the deleted account's browser
+    // kept working cookies until they expired.
+    const options = cookieBase();
+    res.clearCookie('token', options);
+    res.clearCookie('refreshToken', options);
     res.status(200).json({ success: true, message: 'Account deleted' });
 });
 
