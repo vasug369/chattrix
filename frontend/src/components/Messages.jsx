@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -292,13 +292,22 @@ export default function Messages() {
               >
                 ←
               </button>
-              <Avatar src={selected.pic} name={selected.name} size={40} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{selected.name}</p>
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  {peerTyping ? 'typing…' : isOnline(selected._id) ? 'Online' : 'Offline'}
-                </p>
-              </div>
+              {/* The whole identity block is the link, matching the rest of
+                  the app (PostCard links its author the same way) and giving
+                  a target big enough to hit on a phone. */}
+              <Link
+                to={`/profile/${selected._id}`}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 -m-1 transition-colors hover:bg-white/5"
+                title={`View ${selected.name}'s profile`}
+              >
+                <Avatar src={selected.pic} name={selected.name} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{selected.name}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {peerTyping ? 'typing…' : isOnline(selected._id) ? 'Online' : 'Offline'}
+                  </p>
+                </div>
+              </Link>
             </header>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -339,15 +348,27 @@ export default function Messages() {
                         }}
                       >
                         <p className="break-words text-sm">{m.message}</p>
-                        <div className="mt-1 flex items-center justify-end gap-1">
+                        {/* 10px at 70% opacity was effectively invisible. 11px
+                            at a deliberate colour per bubble: white-ish on the
+                            accent gradient, the muted token on glass. */}
+                        <div className="mt-1 flex items-center justify-end gap-1.5">
                           <time
-                            className="text-[10px] opacity-70"
+                            className="text-[11px] tabular-nums"
+                            style={{ color: mine ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)' }}
                             dateTime={m.createdAt}
                           >
                             {formatTime(m.createdAt)}
                           </time>
                           {mine && (
-                            <span className="text-[10px] opacity-80" aria-label={m.readAt ? 'Read' : 'Sent'}>
+                            <span
+                              className="text-[11px] leading-none"
+                              // Read gets a distinct colour, not just a second
+                              // tick: at this size ✓ and ✓✓ are near enough
+                              // identical at a glance to be useless.
+                              style={{ color: m.readAt ? '#7dd3fc' : 'rgba(255,255,255,0.65)' }}
+                              title={m.readAt ? 'Read' : 'Sent'}
+                              aria-label={m.readAt ? 'Read' : 'Sent'}
+                            >
                               {m.readAt ? '✓✓' : '✓'}
                             </span>
                           )}
@@ -363,7 +384,7 @@ export default function Messages() {
                     className="rounded-2xl px-4 py-2.5 text-sm"
                     style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--glass-border)' }}
                   >
-                    <span className="opacity-70">typing…</span>
+                    <span style={{ color: 'var(--text-muted)' }}>typing…</span>
                   </div>
                 </div>
               )}
