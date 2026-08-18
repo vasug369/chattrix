@@ -64,8 +64,14 @@
      imitating light catching a bevelled glass edge. */
   --glass-specular: rgba(255, 255, 255, 0.35);
 
-  --glass-blur: 20px;
-  --glass-blur-strong: 40px;
+  /* Halved from 20/40px. Past roughly 12px the visual difference is
+     marginal, but the cost is not: backdrop-filter forces the compositor to
+     re-sample everything behind each panel on every frame, and the app stacks
+     several. On a mid-range phone that showed up as dropped frames while
+     scrolling the feed — which reads as a cheap app far more than any colour
+     choice does. */
+  --glass-blur: 12px;
+  --glass-blur-strong: 24px;
 
   /* ---- Accents ---- */
   --accent: #8b5cf6;
@@ -74,10 +80,17 @@
   --accent-gradient-warm: linear-gradient(135deg, #d946ef 0%, #8b5cf6 100%);
   --accent-glow: rgba(139, 92, 246, 0.45);
 
-  /* ---- Text ---- */
+  /* ---- Text ----
+     Three steps, each a deliberate rung: primary, secondary, tertiary.
+
+     --text-muted was #6b7a99, which measures about 4.3:1 against the panel
+     background — under the 4.5:1 AA floor. It carries "Online/Offline",
+     timestamps, form hints and every .gl-label, i.e. most of the small text in
+     the app, so the whole interface sat just below legible. #94a3b8 clears AA
+     comfortably at ~7:1 and still reads as clearly secondary. */
   --text: #f8fafc;
-  --text-dim: #a5b4cf;
-  --text-muted: #6b7a99;
+  --text-dim: #c7d2e4;
+  --text-muted: #94a3b8;
 
   /* ---- Status ---- */
   --danger: #f43f5e;
@@ -92,9 +105,20 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  font-family: "Poppins", system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* 1.6 is prose leading. Applied to an interface it pushes every label away
+     from its control and every line of a message apart, so nothing groups —
+     the single biggest reason the UI read as loose and unfinished. Prose that
+     genuinely wants 1.6 opts back in via .prose below. */
+  line-height: 1.5;
   color: var(--text);
+
+  /* Inter ships alternates that make UI text less fussy: a straight-sided "a"
+     and "g", and slashed zeros so IDs and timestamps cannot be misread. */
+  font-feature-settings: "cv05" 1, "cv08" 1, "zero" 1, "ss03" 1;
+  /* Tabular numerals so timestamps and counters do not shift width as they
+     tick — digits jittering in place is a small thing that reads as unfinished. */
+  font-variant-numeric: tabular-nums;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -114,6 +138,23 @@
 html,
 body {
   min-height: 100%;
+}
+
+/* Headings tighten as they grow: at display sizes the default spacing looks
+   airy and unset. Negative tracking on large type is most of what separates a
+   considered heading from a default one. */
+h1, h2, h3, h4 {
+  line-height: 1.25;
+  letter-spacing: -0.011em;
+  text-wrap: balance;
+}
+h1 { letter-spacing: -0.022em; }
+h2 { letter-spacing: -0.018em; }
+
+/* Opt back in to prose leading for running text. */
+.prose {
+  line-height: 1.65;
+  max-width: 68ch;
 }
 
 body {
@@ -285,17 +326,20 @@ body {
   pointer-events: none;
 }
 
-/* Interactive lift for clickable glass. */
+/* Interactive lift for clickable glass.
+   Was -3px over 0.4s. Hover feedback should confirm the pointer is on target,
+   not animate; at that distance and duration cards visibly heaved as the mouse
+   crossed the feed, and the lag made the UI feel imprecise. */
 .glass-hover {
   transition:
-    transform 0.4s var(--ease-out),
-    border-color 0.4s var(--ease-out),
-    box-shadow 0.4s var(--ease-out);
+    transform 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    box-shadow 0.18s var(--ease-out);
 }
 .glass-hover:hover {
-  transform: translateY(-3px);
+  transform: translateY(-1px);
   border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-lifted), 0 0 40px -12px var(--accent-glow);
+  box-shadow: var(--shadow-lifted), 0 0 24px -14px var(--accent-glow);
 }
 
 /* Glowing ring for the active/featured state. */
@@ -354,17 +398,20 @@ body {
   font-weight: 600;
   color: #fff;
   cursor: pointer;
+  /* The class is used on <a> as well as <button> (the drawer's "View full
+     profile"), where the browser would otherwise underline it. */
+  text-decoration: none;
   background: var(--accent-gradient);
   background-size: 200% 200%;
   transition:
-    transform 0.3s var(--ease-spring),
-    box-shadow 0.3s var(--ease-out),
-    background-position 0.6s var(--ease-out);
+    transform 0.15s var(--ease-out),
+    box-shadow 0.15s var(--ease-out),
+    background-position 0.35s var(--ease-out);
 }
 .gl-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   background-position: 100% 50%;
-  box-shadow: 0 10px 30px -8px var(--accent-glow);
+  box-shadow: 0 6px 18px -8px var(--accent-glow);
 }
 .gl-btn:active:not(:disabled) {
   transform: translateY(0);
@@ -426,6 +473,68 @@ body {
 }
 
 /* ============================================================
+   4b. DRAWER
+   A side panel for reference content shown alongside the thing it
+   describes — currently the profile opened from a conversation.
+
+   Desktop: anchored to the right edge, the conversation still visible
+   and undimmed beside it, as in WhatsApp Web and Slack. The scrim is
+   present but transparent: it exists to catch the click-outside, not
+   to dim anything.
+
+   Mobile: the same panel fills the screen, because there is no room to
+   show both. That matches the full-screen push those apps use on a
+   phone, and it means one component covers both cases.
+   ============================================================ */
+
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+}
+
+.drawer-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  animation: drawerInMobile 0.22s var(--ease-out) both;
+}
+
+@media (min-width: 768px) {
+  .drawer-scrim {
+    /* Barely-there tint. Enough to signal the panel has focus, not enough
+       to hide the conversation the user is checking against. */
+    background: rgba(4, 2, 12, 0.35);
+  }
+
+  .drawer-panel {
+    inset: 0 0 0 auto;
+    width: 380px;
+    max-width: 92vw;
+    border-radius: 20px 0 0 20px;
+    border-right: none;
+    animation: drawerIn 0.22s var(--ease-out) both;
+  }
+}
+
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes drawerInMobile {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
    5. SCROLLBAR
    ============================================================ */
 
@@ -452,8 +561,12 @@ body {
    6. ANIMATIONS
    ============================================================ */
 
+/* Entrances travel a short distance quickly. The previous 20px/0.55s slide
+   meant content was still visibly moving after it had arrived, so every screen
+   opened with a lurch — and with stagger delays on top, the sixth card landed
+   almost a second after the first. */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
@@ -484,18 +597,20 @@ body {
   to { transform: rotate(360deg); }
 }
 
-.animate-fade-in-up { animation: fadeInUp 0.55s var(--ease-out) both; }
-.animate-fade-in    { animation: fadeIn 0.4s var(--ease-out) both; }
-.animate-slide-in   { animation: slideInLeft 0.45s var(--ease-out) both; }
-.animate-scale-in   { animation: scaleIn 0.3s var(--ease-spring) both; }
+.animate-fade-in-up { animation: fadeInUp 0.28s var(--ease-out) both; }
+.animate-fade-in    { animation: fadeIn 0.2s var(--ease-out) both; }
+.animate-slide-in   { animation: slideInLeft 0.24s var(--ease-out) both; }
+.animate-scale-in   { animation: scaleIn 0.18s var(--ease-out) both; }
 .animate-pulse-glow { animation: pulseGlow 3.5s ease-in-out infinite; }
 
+/* Stagger reads as intent up to about 150ms total; beyond that it is just
+   latency the user has to wait through. Halved, and capped at the 6th child. */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 30ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 90ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 150ms; }
 
 /* Loading skeleton — a shimmer sweeping across a glass block. */
 .gl-skeleton {
