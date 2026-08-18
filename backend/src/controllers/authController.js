@@ -1,5 +1,6 @@
 import {
     accessCookieOptions,
+    clearLegacyHostOnlyCookies,
     cookieBase,
     issueTokens,
     loginUser,
@@ -39,6 +40,7 @@ export const login = asyncHandler(async (req, res) => {
     // this login came from.
     const { user, token, refreshToken } = await loginUser(req.body, req);
 
+    clearLegacyHostOnlyCookies(res);
     res.cookie('token', token, accessCookieOptions());
     res.cookie('refreshToken', refreshToken, refreshCookieOptions());
 
@@ -71,6 +73,7 @@ export const googleSignIn = asyncHandler(async (req, res) => {
         req
     );
 
+    clearLegacyHostOnlyCookies(res);
     res.cookie('token', token, accessCookieOptions());
     res.cookie('refreshToken', refreshToken, refreshCookieOptions());
 
@@ -105,6 +108,9 @@ export const logout = asyncHandler(async (req, res) => {
     const options = cookieBase();
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
+    // Domain is part of a cookie's identity, so the line above misses a
+    // pre-migration host-only cookie entirely and the user stays signed in.
+    clearLegacyHostOnlyCookies(res);
     res.status(200).json({ success: true, message: 'Logged out' });
 });
 
@@ -170,6 +176,7 @@ export const refresh = asyncHandler(async (req, res) => {
     await extendSession(jti);
 
     const { token, refreshToken } = issueTokens(req.user, jti);
+    clearLegacyHostOnlyCookies(res);
     res.cookie('token', token, accessCookieOptions());
     res.cookie('refreshToken', refreshToken, refreshCookieOptions());
     res.status(200).json({ success: true, message: 'Session refreshed' });
@@ -206,5 +213,8 @@ export const performPasswordReset = asyncHandler(async (req, res) => {
     const options = cookieBase();
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
+    // Domain is part of a cookie's identity, so the line above misses a
+    // pre-migration host-only cookie entirely and the user stays signed in.
+    clearLegacyHostOnlyCookies(res);
     res.status(200).json({ success: true, message: 'Password reset successfully. Please sign in.' });
 });

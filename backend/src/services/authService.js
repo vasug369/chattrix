@@ -32,6 +32,32 @@ export const accessCookieOptions = () => ({ ...cookieBase(), maxAge: 15 * 60 * 1
 export const refreshCookieOptions = () => ({ ...cookieBase(), maxAge: 7 * 24 * 60 * 60 * 1000 });
 
 /**
+ * Delete the host-only cookies issued before COOKIE_DOMAIN existed.
+ *
+ * Domain is part of a cookie's identity, so setting `.example.com/token` does
+ * not replace an existing host-only `example.com/token` — the browser keeps
+ * both and sends both, oldest first. `cookie.parse` keeps the first occurrence
+ * of a name, so the stale one wins every request, and being host-only it is
+ * still never sent to the API subdomain. The result is a user who appears
+ * signed in, whose realtime silently does not work, for as long as the old
+ * refresh cookie lives (7 days) — and who spawns a fresh session row on each
+ * attempt to fix it by logging in again.
+ *
+ * Called immediately before the new cookies are set. Passing no `domain` is
+ * what makes this target the host-only variant specifically.
+ */
+export const clearLegacyHostOnlyCookies = (res) => {
+  if (!env.COOKIE_DOMAIN) return;
+  const legacy = {
+    httpOnly: true,
+    secure: env.isProduction,
+    sameSite: env.isProduction ? 'None' : 'Lax',
+  };
+  res.clearCookie('token', legacy);
+  res.clearCookie('refreshToken', legacy);
+};
+
+/**
  * Mint the token pair for a session.
  *
  * Both tokens carry the same `jti`, which names a row in the Session
