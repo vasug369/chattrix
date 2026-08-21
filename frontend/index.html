@@ -3,9 +3,50 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Chattrix - Connect, Share, Chat with your community" />
+
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="theme-color" content="#070511" />
+
+  <!--
+    SEO note. Chattrix is an application, not a content site: every route but
+    this one is behind authentication, so exactly one page is indexable and
+    robots.txt disallows the rest. The realistic goal is ranking for the name
+    "Chattrix", not organic discovery.
+
+    The canonical host is www. chattrix.online 308-redirects to
+    www.chattrix.online, so every absolute URL below uses www — pointing
+    Google at the redirecting host makes it resolve one before indexing, and
+    a sitemap full of redirects is a Search Console warning. If the primary
+    domain is ever flipped in Vercel, this file, sitemap.xml and robots.txt
+    all have to change together.
+  -->
+  <title>Chattrix — Real-time messaging and a shared feed</title>
+  <meta name="description"
+    content="Chattrix is a real-time chat and social app: direct messages with typing indicators and read receipts, a shared post feed, profiles and follows." />
+  <link rel="canonical" href="https://www.chattrix.online/" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+
+  <!-- Open Graph: what WhatsApp, LinkedIn, Slack and Facebook show when the
+       link is shared. Without these a shared link renders as a bare URL, and
+       for an app nobody can browse without signing in, the share preview is
+       most of the first impression. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Chattrix" />
+  <meta property="og:url" content="https://www.chattrix.online/" />
+  <meta property="og:title" content="Chattrix — Real-time messaging and a shared feed" />
+  <meta property="og:description"
+    content="Direct messages with typing indicators and read receipts, a shared post feed, profiles and follows." />
+  <meta property="og:image" content="https://www.chattrix.online/og-cover.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Chattrix — real-time messaging and a shared feed" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Chattrix — Real-time messaging and a shared feed" />
+  <meta name="twitter:description"
+    content="Direct messages with typing indicators and read receipts, a shared post feed, profiles and follows." />
+  <meta name="twitter:image" content="https://www.chattrix.online/og-cover.png" />
 
   <!--
     Inter, as a single variable font covering 400-700.
@@ -23,11 +64,58 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap"
     rel="stylesheet">
 
-  <title>Chattrix</title>
+  <!-- Structured data. Lets Google show the name and description as a
+       recognised entity rather than guessing them from an empty page. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Chattrix",
+    "url": "https://www.chattrix.online/",
+    "applicationCategory": "CommunicationApplication",
+    "operatingSystem": "Any modern web browser",
+    "description": "A real-time chat and social app: direct messages with typing indicators and read receipts, a shared post feed, profiles and follows.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" }
+  }
+  </script>
 </head>
 
 <body>
   <div id="root"></div>
+
+  <!--
+    Crawlable fallback.
+
+    The app renders entirely in JavaScript, so the HTML Google receives is an
+    empty <div id="root">. Googlebot does execute JS, but on a second pass
+    that can lag the first by days, and other crawlers — the ones that build
+    link previews — do not execute it at all. This gives every one of them
+    real text describing the page on the first request.
+
+    It is a genuine <noscript>: users with JavaScript see none of it, so it is
+    not cloaking, and it says the same thing the rendered page does.
+  -->
+  <noscript>
+    <main>
+      <h1>Chattrix</h1>
+      <p>
+        Chattrix is a real-time chat and social application. Sign in to send
+        direct messages with typing indicators and read receipts, share posts
+        to a common feed, follow other people and manage the devices your
+        account is signed in on.
+      </p>
+      <h2>What it does</h2>
+      <ul>
+        <li>Direct messages delivered instantly over a live connection</li>
+        <li>Typing indicators and read receipts</li>
+        <li>A shared feed of posts, with likes and comments</li>
+        <li>Profiles, following and notifications</li>
+        <li>Per-device sign-in management and remote sign-out</li>
+      </ul>
+      <p>Chattrix needs JavaScript enabled to run.</p>
+    </main>
+  </noscript>
+
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
