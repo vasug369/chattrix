@@ -1,0 +1,31 @@
+# https://www.chattrix.online/robots.txt
+#
+# Chattrix is an application, not a content site: everything except the
+# landing page sits behind authentication. Those routes all return the same
+# SPA shell to a crawler, so leaving them open would offer Google a dozen
+# URLs with identical content and no way to tell them apart.
+#
+# NOTE: this file must exist as a real static file. vercel.json rewrites
+# /(.*) to /index.html, so without it the path resolves to the HTML shell and
+# returns 200 — a crawler asking for robots.txt receives a web page.
+
+User-agent: *
+
+# Authenticated application routes. Nothing here is reachable without a
+# session, and every one of them renders the login screen to a crawler.
+Disallow: /dashboard
+Disallow: /search
+Disallow: /create-post
+Disallow: /profile
+Disallow: /messages
+Disallow: /sessions
+
+# One-time transactional flows reached from an email link. Indexing them
+# would surface a dead-end form in search results.
+Disallow: /verify-email
+Disallow: /forgot-password
+
+# Proxied to the API on EC2. JSON, and much of it requires a session.
+Disallow: /api/
+
+Sitemap: https://www.chattrix.online/sitemap.xml

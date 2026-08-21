@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Only the landing page is listed, because it is the only public page.
+  Everything else requires a session and is disallowed in robots.txt.
+
+  URLs use the www host on purpose: chattrix.online 308-redirects to
+  www.chattrix.online, so the bare domain is not the canonical address. A
+  sitemap listing redirects is a warning in Search Console.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.chattrix.online/</loc>
+    <lastmod>2026-08-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
