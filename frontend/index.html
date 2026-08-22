@@ -13,7 +13,13 @@
 
     sizes="any" on the SVG stops Chrome from preferring the .ico at some scales.
   -->
-  <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  <!--
+    The .ico genuinely contains 48, 32 and 16, and Google picks the site icon
+    it shows in search results from this hint. It recommends a square that is a
+    multiple of 48, so understating the file as 32x32 hid the one size it
+    actually wants.
+  -->
+  <link rel="icon" href="/favicon.ico" sizes="48x48 32x32 16x16" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
