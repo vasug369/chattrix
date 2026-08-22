@@ -48,6 +48,14 @@ export function SocketProvider({ children }) {
     // however many people happen to be online on every single connect.
     s.on('presence:sync', (ids) => setOnlineUsers(new Set(ids.map(String))));
 
+    // Deploy-order insurance. The frontend and the API ship on separate
+    // pipelines, and Vercel is normally the faster of the two, so there is a
+    // window where this build is live against an API that still only sends the
+    // old full-list event. Without this the window renders as "nobody is
+    // online". The new API also sends it, once, with the same ids as the
+    // snapshot — so handling both is idempotent rather than conflicting.
+    s.on('getOnlineUsers', (ids) => setOnlineUsers(new Set(ids.map(String))));
+
     s.on('presence:online', (id) =>
       setOnlineUsers((prev) => new Set(prev).add(String(id)))
     );
@@ -78,6 +86,7 @@ export function SocketProvider({ children }) {
 
     return () => {
       s.off('presence:sync');
+      s.off('getOnlineUsers');
       s.off('presence:online');
       s.off('presence:offline');
       s.off('session:revoked');
