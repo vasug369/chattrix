@@ -15,7 +15,9 @@ const SocketContext = createContext(null);
 export function SocketProvider({ children }) {
   const { user, isAuthenticated, logout } = useAuth();
   const [socket, setSocket] = useState(null);
-  const [onlineUsers, setOnlineUsers] = useState([]);
+  // A Set, not an array: `isOnline` is called once per rendered avatar, and
+  // Array.includes made that a scan of the whole online list per avatar.
+  const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [latestNotification, setLatestNotification] = useState(null);
   const socketRef = useRef(null);
@@ -27,7 +29,7 @@ export function SocketProvider({ children }) {
       socketRef.current?.disconnect();
       socketRef.current = null;
       setSocket(null);
-      setOnlineUsers([]);
+      setOnlineUsers(new Set());
       setUnreadNotifications(0);
       return undefined;
     }
@@ -41,7 +43,30 @@ export function SocketProvider({ children }) {
     socketRef.current = s;
     setSocket(s);
 
-    s.on('getOnlineUsers', setOnlineUsers);
+    // The server sends the full list once, on connect, and then one id at a
+    // time as people come and go — so this no longer receives a list sized by
+    // however many people happen to be online on every single connect.
+    s.on('presence:sync', (ids) => setOnlineUsers(new Set(ids.map(String))));
+
+    // Deploy-order insurance. The frontend and the API ship on separate
+    // pipelines, and Vercel is normally the faster of the two, so there is a
+    // window where this build is live against an API that still only sends the
+    // old full-list event. Without this the window renders as "nobody is
+    // online". The new API also sends it, once, with the same ids as the
+    // snapshot — so handling both is idempotent rather than conflicting.
+    s.on('getOnlineUsers', (ids) => setOnlineUsers(new Set(ids.map(String))));
+
+    s.on('presence:online', (id) =>
+      setOnlineUsers((prev) => new Set(prev).add(String(id)))
+    );
+
+    s.on('presence:offline', (id) =>
+      setOnlineUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(String(id));
+        return next;
+      })
+    );
 
     // The server closes this socket when the session behind it is revoked from
     // another device. Without handling it, the page kept rendering as though
@@ -60,7 +85,10 @@ export function SocketProvider({ children }) {
     s.on('notification:count', ({ unread }) => setUnreadNotifications(unread));
 
     return () => {
+      s.off('presence:sync');
       s.off('getOnlineUsers');
+      s.off('presence:online');
+      s.off('presence:offline');
       s.off('session:revoked');
       s.off('notification:new');
       s.off('notification:count');
@@ -82,7 +110,7 @@ export function SocketProvider({ children }) {
     () => ({
       socket,
       onlineUsers,
-      isOnline: (id) => onlineUsers.includes(String(id)),
+      isOnline: (id) => onlineUsers.has(String(id)),
       unreadNotifications,
       setUnreadNotifications,
       latestNotification,
