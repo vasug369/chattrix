@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Chattrix">
+  <!--
+    Chattrix mark. Two overlapping speech bubbles on the app's own accent
+    gradient, the same three stops as the accent gradient token in src/index.css.
+
+    The back bubble is translucent and the front one is solid, so at 16px the
+    translucent shape sinks into the gradient and the solid silhouette carries
+    the icon on its own. The transparent ring between them is a hole punched in
+    the back bubble rather than a stroke, so it stays exactly one colour: the
+    gradient behind it.
+  -->
+  <defs>
+    <linearGradient id="c-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset=".5" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <mask id="c-gap">
+      <rect width="512" height="512" fill="#fff"/>
+      <g fill="#000">
+        <rect x="55" y="153" width="300" height="240" rx="77"/>
+        <path d="M111 356 L81 467 L239 391 Z"/>
+      </g>
+    </mask>
+  </defs>
+
+  <rect width="512" height="512" rx="114" fill="url(#c-grad)"/>
+  <rect x="238" y="92" width="198" height="154" rx="54" fill="#fff" opacity=".47" mask="url(#c-gap)"/>
+  <g fill="#fff">
+    <rect x="70" y="168" width="270" height="210" rx="62"/>
+    <path d="M126 356 L96 452 L224 376 Z"/>
+  </g>
+</svg>
