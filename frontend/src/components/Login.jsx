@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage, fieldErrors } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Banner, Button, Field } from './ui/Glass';
+import Footer from './ui/Footer';
 import GoogleSignInButton, { googleSignInAvailable } from './GoogleSignInButton';
 
 const EMPTY = { name: '', email: '', password: '', confirmPassword: '' };
@@ -111,149 +112,153 @@ export default function Login() {
   const isSignup = mode === 'signup';
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center px-4 py-10">
-      <div className="glass-strong w-full max-w-[440px] p-8 sm:p-10 animate-fade-in-up">
-        <div className="mb-8 text-center">
-          <img
-            src="/favicon.svg"
-            alt=""
-            width="64"
-            height="64"
-            className="mb-5 inline-block h-16 w-16 rounded-2xl animate-pulse-glow"
-            aria-hidden="true"
-          />
-          <h1 className="text-3xl font-bold sm:text-4xl">
-            <span className="gl-gradient-text">Chattrix</span>
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-dim)' }}>
-            {isSignup ? 'Create your account to get started' : 'Welcome back — sign in to continue'}
-          </p>
-        </div>
-
-        {banner && (
-          <Banner tone={banner.tone} onDismiss={() => setBanner(null)}>
-            {banner.text}
-          </Banner>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 stagger-children" noValidate>
-          {isSignup && (
-            <Field
-              id="input-name"
-              label="Full name"
-              type="text"
-              placeholder="Ada Lovelace"
-              value={form.name}
-              onChange={set('name')}
-              error={errors.name}
-              autoComplete="name"
-              required
-              className="animate-fade-in-up"
+    <div className="flex min-h-screen w-full flex-col px-4 py-10">
+      <div className="flex flex-1 items-center justify-center">
+        <div className="glass-strong w-full max-w-[440px] p-8 sm:p-10 animate-fade-in-up">
+          <div className="mb-8 text-center">
+            <img
+              src="/favicon.svg"
+              alt=""
+              width="64"
+              height="64"
+              className="mb-5 inline-block h-16 w-16 rounded-2xl animate-pulse-glow"
+              aria-hidden="true"
             />
+            <h1 className="text-3xl font-bold sm:text-4xl">
+              <span className="gl-gradient-text">Chattrix</span>
+            </h1>
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-dim)' }}>
+              {isSignup ? 'Create your account to get started' : 'Welcome back — sign in to continue'}
+            </p>
+          </div>
+
+          {banner && (
+            <Banner tone={banner.tone} onDismiss={() => setBanner(null)}>
+              {banner.text}
+            </Banner>
           )}
 
-          <Field
-            id="input-email"
-            label="Email address"
-            type="email"
-            placeholder="you@example.com"
-            value={form.email}
-            onChange={set('email')}
-            error={errors.email}
-            autoComplete="email"
-            required
-            className="animate-fade-in-up"
-          />
-
-          <Field
-            id="input-password"
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            value={form.password}
-            onChange={set('password')}
-            error={errors.password}
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
-            required
-            className="animate-fade-in-up"
-          />
-
-          {isSignup && (
-            <>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 stagger-children" noValidate>
+            {isSignup && (
               <Field
-                id="input-confirm-password"
-                label="Confirm password"
-                type="password"
-                placeholder="••••••••"
-                value={form.confirmPassword}
-                onChange={set('confirmPassword')}
-                error={errors.confirmPassword}
-                autoComplete="new-password"
+                id="input-name"
+                label="Full name"
+                type="text"
+                placeholder="Ada Lovelace"
+                value={form.name}
+                onChange={set('name')}
+                error={errors.name}
+                autoComplete="name"
                 required
                 className="animate-fade-in-up"
               />
-              <p className="-mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                At least 8 characters, with an uppercase letter, a lowercase letter and a number.
-              </p>
+            )}
+
+            <Field
+              id="input-email"
+              label="Email address"
+              type="email"
+              placeholder="you@example.com"
+              value={form.email}
+              onChange={set('email')}
+              error={errors.email}
+              autoComplete="email"
+              required
+              className="animate-fade-in-up"
+            />
+
+            <Field
+              id="input-password"
+              label="Password"
+              type="password"
+              placeholder="••••••••"
+              value={form.password}
+              onChange={set('password')}
+              error={errors.password}
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              required
+              className="animate-fade-in-up"
+            />
+
+            {isSignup && (
+              <>
+                <Field
+                  id="input-confirm-password"
+                  label="Confirm password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={form.confirmPassword}
+                  onChange={set('confirmPassword')}
+                  error={errors.confirmPassword}
+                  autoComplete="new-password"
+                  required
+                  className="animate-fade-in-up"
+                />
+                <p className="-mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  At least 8 characters, with an uppercase letter, a lowercase letter and a number.
+                </p>
+              </>
+            )}
+
+            {!isSignup && (
+              <div className="-mt-1 text-right">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs transition-opacity hover:opacity-80"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+            )}
+
+            <Button id="btn-submit" type="submit" loading={loading} className="mt-2 w-full">
+              {isSignup ? 'Create account' : 'Sign in'}
+            </Button>
+          </form>
+
+          {googleSignInAvailable && (
+            <>
+              <div className="my-6 flex items-center gap-4">
+                <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
+                <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
+              </div>
+
+              <GoogleSignInButton
+                disabled={loading}
+                onCredential={handleGoogleCredential}
+                onError={() =>
+                  setBanner({ tone: 'error', text: 'Could not load Google sign-in.' })
+                }
+              />
             </>
           )}
 
-          {!isSignup && (
-            <div className="-mt-1 text-right">
-              <Link
-                to="/forgot-password"
-                className="text-xs transition-opacity hover:opacity-80"
-                style={{ color: 'var(--accent)' }}
-              >
-                Forgot your password?
-              </Link>
-            </div>
-          )}
-
-          <Button id="btn-submit" type="submit" loading={loading} className="mt-2 w-full">
-            {isSignup ? 'Create account' : 'Sign in'}
-          </Button>
-        </form>
-
-        {googleSignInAvailable && (
-          <>
+          {/* Only one rule above the mode switch. When the Google block is
+              present it brings its own, and a second one directly beneath it
+              read as an empty section. */}
+          {!googleSignInAvailable && (
             <div className="my-6 flex items-center gap-4">
               <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
               <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
             </div>
+          )}
 
-            <GoogleSignInButton
-              disabled={loading}
-              onCredential={handleGoogleCredential}
-              onError={() =>
-                setBanner({ tone: 'error', text: 'Could not load Google sign-in.' })
-              }
-            />
-          </>
-        )}
-
-        {/* Only one rule above the mode switch. When the Google block is
-            present it brings its own, and a second one directly beneath it
-            read as an empty section. */}
-        {!googleSignInAvailable && (
-          <div className="my-6 flex items-center gap-4">
-            <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
-            <div className="h-px flex-1" style={{ background: 'var(--glass-border)' }} />
-          </div>
-        )}
-
-        <Button
-          id="btn-toggle-mode"
-          type="button"
-          variant="ghost"
-          onClick={switchMode}
-          className={googleSignInAvailable ? 'mt-6 w-full' : 'w-full'}
-        >
-          {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-        </Button>
+          <Button
+            id="btn-toggle-mode"
+            type="button"
+            variant="ghost"
+            onClick={switchMode}
+            className={googleSignInAvailable ? 'mt-6 w-full' : 'w-full'}
+          >
+            {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+          </Button>
+        </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
