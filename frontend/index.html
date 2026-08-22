@@ -5,7 +5,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <!--
+    Icons. The SVG is what every current browser actually uses; favicon.ico is
+    the fallback for older ones and for the places that still request /favicon.ico
+    blind, such as feed readers and link unfurlers. apple-touch-icon covers "Add
+    to Home Screen" on iOS, which ignores the manifest entirely.
+
+    sizes="any" on the SVG stops Chrome from preferring the .ico at some scales.
+  -->
+  <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
   <meta name="theme-color" content="#070511" />
 
   <!--
