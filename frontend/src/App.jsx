@@ -5,6 +5,7 @@ import { SocketProvider } from './context/SocketContext';
 
 import Aurora from './components/ui/Aurora';
 import NavBar from './components/NavBar';
+import Footer from './components/ui/Footer';
 import ProtectedRoute from './components/ProtectedRoutes';
 
 import Login from './components/Login';
@@ -20,8 +21,14 @@ import SearchPeople from './components/SearchPeople';
 /** Protected pages share the nav bar; the auth pages deliberately do not. */
 const Shell = ({ children }) => (
   <ProtectedRoute>
-    <NavBar />
-    <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+    {/* A column with a growing middle: on a short page the footer is pushed
+        to the bottom of the viewport, on a long one it is pushed below the
+        fold. Fixed positioning would have covered content on every scroll. */}
+    <div className="flex min-h-screen flex-col">
+      <NavBar />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+      <Footer />
+    </div>
   </ProtectedRoute>
 );
 
