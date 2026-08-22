@@ -59,13 +59,14 @@ export default function NavBar() {
     <header className="sticky top-0 z-40 px-4 pt-4">
       <nav className="glass-panel mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <NavLink to="/dashboard" className="flex items-center gap-2.5 shrink-0">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-lg"
-            style={{ background: 'var(--accent-gradient)' }}
+          <img
+            src="/favicon.svg"
+            alt=""
+            width="36"
+            height="36"
+            className="h-9 w-9 shrink-0"
             aria-hidden="true"
-          >
-            💬
-          </span>
+          />
           <span className="hidden text-lg font-bold sm:block gl-gradient-text">Chattrix</span>
         </NavLink>
 
