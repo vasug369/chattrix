@@ -29,6 +29,17 @@ const userSockets = new Map();
  */
 const sessionSockets = new Map();
 
+/**
+ * Presence wire format.
+ *
+ * `sync` carries the whole online list and goes to one socket, on connect.
+ * `online`/`offline` carry a single user id and go to everyone, and only when
+ * a user actually crosses the online boundary — not on every extra tab.
+ */
+export const PRESENCE_SYNC = 'presence:sync';
+export const PRESENCE_ONLINE = 'presence:online';
+export const PRESENCE_OFFLINE = 'presence:offline';
+
 export const initSocket = (httpServer) => {
     io = new Server(httpServer, {
         cors: {
@@ -52,7 +63,13 @@ export const initSocket = (httpServer) => {
             return;
         }
 
-        if (!userSockets.has(userId)) userSockets.set(userId, new Set());
+        // Whether this connection is what brings the user online, as opposed
+        // to a second tab for someone already connected. Has to be read before
+        // the socket is recorded, and it is what keeps the delta below from
+        // firing once per tab.
+        const isFirstSocket = !userSockets.has(userId);
+
+        if (isFirstSocket) userSockets.set(userId, new Set());
         userSockets.get(userId).add(socket.id);
         socket.join(roomFor(userId));
 
@@ -64,7 +81,23 @@ export const initSocket = (httpServer) => {
             sessionSockets.get(jti).add(socket.id);
         }
 
-        broadcastOnlineUsers();
+        // Presence: one snapshot to the socket that just arrived, then single
+        // user ids to everyone else as people come and go.
+        //
+        // This was an io.emit() of the entire online list on every connect and
+        // every disconnect, which costs N ids delivered to N recipients. At 100
+        // users online that is ~270KB per connect; at 1000 it is ~27MB, and
+        // ordinary tab churn saturates the instance's network long before
+        // anything else on the box is under load.
+        //
+        // The list still goes out under the old event name, but only to the
+        // socket that just connected. A tab left open across this deploy gets a
+        // correct list once and then stops updating, rather than showing nobody.
+        const snapshot = [...userSockets.keys()];
+        socket.emit(PRESENCE_SYNC, snapshot);
+        socket.emit('getOnlineUsers', snapshot);
+
+        if (isFirstSocket) socket.broadcast.emit(PRESENCE_ONLINE, userId);
 
         socket.on('typing', ({ to }) => {
             if (to) io.to(roomFor(to)).emit('typing', { from: userId });
@@ -87,8 +120,10 @@ export const initSocket = (httpServer) => {
             // Only report the user offline once their last tab closes —
             // the previous single-socket map marked them offline on the first
             // disconnect even if other tabs were still connected.
-            if (sockets.size === 0) userSockets.delete(userId);
-            broadcastOnlineUsers();
+            if (sockets.size === 0) {
+                userSockets.delete(userId);
+                io?.emit(PRESENCE_OFFLINE, userId);
+            }
         });
     });
 
@@ -96,10 +131,6 @@ export const initSocket = (httpServer) => {
 };
 
 const roomFor = (userId) => `user:${userId}`;
-
-const broadcastOnlineUsers = () => {
-    io?.emit('getOnlineUsers', [...userSockets.keys()]);
-};
 
 export const getOnlineUserIds = () => [...userSockets.keys()];
 
