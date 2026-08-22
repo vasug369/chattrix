@@ -114,13 +114,14 @@ export default function Login() {
     <div className="flex min-h-screen w-full items-center justify-center px-4 py-10">
       <div className="glass-strong w-full max-w-[440px] p-8 sm:p-10 animate-fade-in-up">
         <div className="mb-8 text-center">
-          <div
-            className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl text-3xl animate-pulse-glow"
-            style={{ background: 'var(--accent-gradient)' }}
+          <img
+            src="/favicon.svg"
+            alt=""
+            width="64"
+            height="64"
+            className="mb-5 inline-block h-16 w-16 rounded-2xl animate-pulse-glow"
             aria-hidden="true"
-          >
-            💬
-          </div>
+          />
           <h1 className="text-3xl font-bold sm:text-4xl">
             <span className="gl-gradient-text">Chattrix</span>
           </h1>
