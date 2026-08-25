@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -21,6 +22,17 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// Responses went out uncompressed: no content-encoding header on any of them
+// in production. The payloads here are JSON — feeds, message pages, session
+// lists — which is the most compressible thing there is, around a 70%
+// reduction, and the saving lands hardest on the mobile connections that can
+// least afford the bytes.
+//
+// Deliberately not also enabled in nginx. Compressing twice costs CPU for
+// nothing, and doing it in the app rather than the proxy keeps the behaviour
+// identical in local development, in tests, and in production.
+app.use(compression());
 
 // A body limit: without one, a single request could buffer unbounded JSON.
 app.use(express.json({ limit: '1mb' }));
