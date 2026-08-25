@@ -59,7 +59,9 @@ export const getMessages = asyncHandler(async (req, res) => {
     // that array grows unboundedly and was loaded in full on every open.
     const [messages, total] = await Promise.all([
         Message.find(filter)
-            .sort({ createdAt: -1 })
+            // _id breaks ties: createdAt is only millisecond-resolution, and
+            // an ambiguous order makes paging drop or repeat a message.
+            .sort({ createdAt: -1, _id: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
             .lean(),
