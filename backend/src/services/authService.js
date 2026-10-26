@@ -19,9 +19,10 @@ import { createSession, revokeAllSessionsService } from './sessionService.js';
 export const cookieBase = () => ({
   httpOnly: true,
   secure: env.isProduction,
-  // Cross-site cookies (Vercel frontend -> Render API) require SameSite=None,
-  // which browsers only honour alongside Secure.
-  sameSite: env.isProduction ? 'None' : 'Lax',
+  // Lax keeps the cookie off cross-site requests (CSRF). Every legitimate
+  // caller is same-site: HTTP goes through the frontend's /api proxy, and the
+  // socket handshake to api.<domain> shares the registrable domain.
+  sameSite: 'Lax',
   // Shares the cookie with every subdomain of the parent, so the socket
   // handshake against api.<domain> carries it. Omitted entirely when unset —
   // passing `domain: undefined` is fine, but an empty string is not.
@@ -103,11 +104,8 @@ const escapeHtml = (value = '') =>
     .replace(/'/g, '&#39;');
 
 /**
- * Sent once, at registration rather than after verification.
- *
- * Verification is not currently enforced anywhere (requireVerifiedEmail exists
- * but is not wired to a route), so welcoming people at verification time would
- * mean most accounts never receive one.
+ * Sent once, at registration rather than after verification, so every account
+ * receives one even if the owner never verifies.
  */
 export const welcomeEmail = (name) => {
   const safeName = escapeHtml(name);

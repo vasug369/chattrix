@@ -11,7 +11,7 @@ A social platform combining microblogging with real-time messaging, built with R
 | Frontend   | React 19, Vite 6, Tailwind CSS v4, React Router v7, Axios, Socket.io-client |
 | Backend    | Node.js, Express 5, Mongoose 8, JWT, Socket.io, Cloudinary, Nodemailer |
 | Validation | Zod (every endpoint) |
-| Testing    | Vitest + Supertest + mongodb-memory-server (169 tests) |
+| Testing    | Vitest + Supertest + mongodb-memory-server |
 | Database   | MongoDB Atlas |
 | Deployment | Frontend: Vercel · Backend: Render |
 
@@ -87,7 +87,7 @@ npm run dev        # Vite, port 5173
 
 ```bash
 cd backend
-npm test           # 169 integration tests, ~5s
+npm test           # integration suite, ~10s
 npm run test:watch
 npm run test:coverage
 ```
@@ -129,6 +129,17 @@ cookie the browser already sends with the handshake, verified in
 `realtime/socketAuth.js`. It previously came from `handshake.query.userId`,
 which the client controls — so anyone could connect as anyone and receive their
 notifications and direct messages.
+
+**Cross-site request forgery is blocked twice.** Session cookies are
+`SameSite=Lax`, so another site's page cannot make the browser send them. And
+`middlewares/originCheck.js` refuses any POST, PUT, PATCH or DELETE whose
+`Origin` header is not in `CORS_ORIGINS`. Requests with no `Origin` (curl,
+tests, server-to-server) carry no browser cookies and pass.
+
+**Writing needs a verified email.** Creating a post, commenting and sending a
+message return `403` until the account's email is verified. Reading works
+without it. It is `403`, not `401`, because the session is valid and the client
+must not sign the user out.
 
 **Secrets come from the environment only.** No credential has a hardcoded
 fallback. Where a service is unconfigured (mail, Cloudinary) the app degrades
@@ -320,6 +331,11 @@ Both `prefers-reduced-motion` (stops the drift) and a
   fails silently: the request returns 200 with no CORS header and the browser
   blocks it client-side. The startup log prints the parsed list so this is
   visible in the deploy log.
+- **`CORS_ORIGINS` also gates every write.** The origin check refuses a POST,
+  PUT, PATCH or DELETE from a browser origin missing from the list with `403`.
+  Production must list the frontend's exact origin
+  (`https://www.chattrix.online`, plus `https://chattrix.online` if it serves
+  the app), or posting, liking and messaging stop working.
 
 ---
 
