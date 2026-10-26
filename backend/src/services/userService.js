@@ -5,8 +5,9 @@ import Notification from "../models/notification.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
 import { destroyImage } from "../config/cloudinaryConfig.js";
-import { badRequest, notFound } from "../utils/AppError.js";
+import { badRequest, forbidden, notFound } from "../utils/AppError.js";
 import { escapeRegex } from "../utils/sanitize.js";
+import { hiddenUserIds, isBlockedBetween } from "./blockService.js";
 
 const PUBLIC_FIELDS = "name pic bio followers following isAccountVerified createdAt";
 
@@ -19,15 +20,27 @@ export const getUserService = async (userId) => {
     return user;
 };
 
-/** Profile view for another user, including whether the viewer follows them. */
+/**
+ * Profile view for another user, including whether the viewer follows them.
+ *
+ * Someone who has been blocked gets the same 404 as for a missing account, so
+ * the profile simply disappears for them. The blocker still sees the profile,
+ * flagged `isBlocked`, so they can unblock.
+ */
 export const getPublicProfileService = async (targetId, viewerId) => {
-    const user = await User.findById(targetId).select(PUBLIC_FIELDS).lean();
-    if (!user) throw notFound("User not found");
+    const isOther = viewerId != null && targetId.toString() !== viewerId.toString();
+    const [user, blockedByTarget, blockedByViewer] = await Promise.all([
+        User.findById(targetId).select(PUBLIC_FIELDS).lean(),
+        isOther ? User.exists({ _id: targetId, blocked: viewerId }) : null,
+        isOther ? User.exists({ _id: viewerId, blocked: targetId }) : null,
+    ]);
+    if (!user || blockedByTarget) throw notFound("User not found");
 
     const postCount = await Post.countDocuments({ author: targetId });
 
     return {
         ...user,
+        isBlocked: Boolean(blockedByViewer),
         followerCount: user.followers?.length ?? 0,
         followingCount: user.following?.length ?? 0,
         postCount,
@@ -111,6 +124,7 @@ export const followUserService = async (userId, followUserId) => {
         User.findById(followUserId),
     ]);
     if (!user || !followUser) throw notFound("User not found");
+    if (await isBlockedBetween(userId, followUserId)) throw forbidden("You can't follow this account");
 
     // $addToSet makes the write idempotent, so a double-click cannot push the
     // same id twice and inflate the follower count.
@@ -175,15 +189,16 @@ export const deleteUserService = async (userId) => {
     return user;
 };
 
-export const getAllUsersService = async ({ page, limit }) => {
+export const getAllUsersService = async ({ page, limit }, viewerId) => {
+    const filter = { _id: { $nin: await hiddenUserIds(viewerId) } };
     const [items, total] = await Promise.all([
-        User.find()
+        User.find(filter)
             .select(PUBLIC_FIELDS)
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
             .lean(),
-        User.countDocuments(),
+        User.countDocuments(filter),
     ]);
 
     return {
@@ -194,9 +209,10 @@ export const getAllUsersService = async ({ page, limit }) => {
 
 export const searchUsersService = async (query, { page, limit }, excludeId) => {
     const term = escapeRegex(query);
+    const hidden = await hiddenUserIds(excludeId);
     const filter = {
         $or: [{ name: { $regex: term, $options: "i" } }, { email: { $regex: term, $options: "i" } }],
-        ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+        ...(excludeId ? { _id: { $nin: [excludeId, ...hidden] } } : {}),
     };
 
     const [items, total] = await Promise.all([

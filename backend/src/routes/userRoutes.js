@@ -1,13 +1,16 @@
 import express from "express";
 import {
+    blockUser,
     deleteMe,
     followUser,
     getAllUsers,
     getMe,
     getUser,
     isFollowing,
+    listBlocked,
     removeMyAvatar,
     searchUsers,
+    unblockUser,
     unfollowUser,
     updateMe,
     updateMyAvatar,
@@ -37,11 +40,14 @@ userRouter.patch('/me', writeLimiter, validate(updateProfileSchema), updateMe);
 userRouter.post('/me/avatar', writeLimiter, avatarUpload.single('pic'), updateMyAvatar);
 userRouter.delete('/me/avatar', writeLimiter, removeMyAvatar);
 userRouter.delete('/me', writeLimiter, deleteMe);
+userRouter.get('/me/blocked', listBlocked);
 
 userRouter.get('/is-following/:id', validate(userIdParamSchema), isFollowing);
 userRouter.get('/:id', validate(userIdParamSchema), getUser);
 
 userRouter.put('/:followUserId/follow', writeLimiter, validate(followParamSchema), followUser);
 userRouter.put('/:unfollowUserId/unfollow', writeLimiter, validate(unfollowParamSchema), unfollowUser);
+userRouter.put('/:id/block', writeLimiter, validate(userIdParamSchema), blockUser);
+userRouter.put('/:id/unblock', writeLimiter, validate(userIdParamSchema), unblockUser);
 
 export default userRouter;

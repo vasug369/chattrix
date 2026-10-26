@@ -31,12 +31,12 @@ export const createPost = asyncHandler(async (req, res) => {
 });
 
 export const getPosts = asyncHandler(async (req, res) => {
-    const result = await getPostsService(req.validatedQuery);
+    const result = await getPostsService(req.validatedQuery, req.user._id);
     res.status(200).json({ success: true, ...result });
 });
 
 export const getPostById = asyncHandler(async (req, res) => {
-    const post = await getPostByIdService(req.params.id);
+    const post = await getPostByIdService(req.params.id, req.user._id);
     res.status(200).json({ success: true, data: post });
 });
 
@@ -56,7 +56,7 @@ export const getMyPosts = asyncHandler(async (req, res) => {
 });
 
 export const getUserPosts = asyncHandler(async (req, res) => {
-    const result = await getUserPostsService(req.params.userId, req.validatedQuery);
+    const result = await getUserPostsService(req.params.userId, req.validatedQuery, req.user._id);
     res.status(200).json({ success: true, ...result });
 });
 
@@ -113,6 +113,6 @@ export const feedPosts = asyncHandler(async (req, res) => {
 
 export const searchPosts = asyncHandler(async (req, res) => {
     const { q, ...pagination } = req.validatedQuery;
-    const result = await searchPostsService(q, pagination);
+    const result = await searchPostsService(q, pagination, req.user._id);
     res.status(200).json({ success: true, ...result });
 });
