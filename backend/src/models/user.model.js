@@ -90,6 +90,16 @@ const userSchema = new mongoose.Schema(
             ref: "User"
         }],
 
+        // Accounts this user has blocked. Enforced on the server wherever one
+        // user can reach another (see services/blockService.js). Never sent to
+        // clients: who you block is private, and the blocked person is not told.
+        blocked: {
+            type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+            default: [],
+            select: false,
+            index: true,
+        },
+
         // OTP fields hold a bcrypt hash, never the six digits themselves — a
         // leaked database read otherwise hands over working reset codes.
         verifyOtp: { type: String, default: "", select: false },
@@ -122,6 +132,7 @@ userSchema.set("toJSON", {
         delete ret.otpAttempts;
         delete ret.googleId;
         delete ret.picPublicId;
+        delete ret.blocked;
         delete ret.__v;
         return ret;
     },

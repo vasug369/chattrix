@@ -10,6 +10,7 @@ import {
     updateAvatarService,
     updateUserService,
 } from '../services/userService.js';
+import { blockUserService, listBlockedService, unblockUserService } from '../services/blockService.js';
 import { clearLegacyHostOnlyCookies, cookieBase } from '../services/authService.js';
 import { cloudinaryEnabled } from '../config/cloudinaryConfig.js';
 import { notify, removeNotification } from '../services/notificationService.js';
@@ -108,6 +109,25 @@ export const isFollowing = asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, data: { isFollowing: following } });
 });
 
+export const blockUser = asyncHandler(async (req, res) => {
+    const target = await blockUserService(req.user._id, req.params.id);
+    res.status(200).json({
+        success: true,
+        message: `You blocked ${target.name}`,
+        data: { isBlocked: true },
+    });
+});
+
+export const unblockUser = asyncHandler(async (req, res) => {
+    await unblockUserService(req.user._id, req.params.id);
+    res.status(200).json({ success: true, message: 'Unblocked', data: { isBlocked: false } });
+});
+
+export const listBlocked = asyncHandler(async (req, res) => {
+    const items = await listBlockedService(req.user._id);
+    res.status(200).json({ success: true, items });
+});
+
 export const deleteMe = asyncHandler(async (req, res) => {
     await deleteUserService(req.user._id);
     // clearCookie only matches a cookie whose attributes it repeats. Called
@@ -121,7 +141,7 @@ export const deleteMe = asyncHandler(async (req, res) => {
 });
 
 export const getAllUsers = asyncHandler(async (req, res) => {
-    const result = await getAllUsersService(req.validatedQuery);
+    const result = await getAllUsersService(req.validatedQuery, req.user._id);
     res.status(200).json({ success: true, ...result });
 });
 

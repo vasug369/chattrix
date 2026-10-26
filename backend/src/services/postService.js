@@ -2,11 +2,19 @@ import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
 import { forbidden, notFound } from "../utils/AppError.js";
 import { escapeRegex } from "../utils/sanitize.js";
+import { hiddenUserIds, isBlockedBetween } from "./blockService.js";
 
 const AUTHOR_FIELDS = "name pic";
 
+/** Drop comments written by anyone in `hidden` (blocked in either direction). */
+const withoutHiddenComments = (post, hidden) => {
+    if (!hidden.length || !post.comments?.length) return post;
+    const ids = new Set(hidden.map(String));
+    return { ...post, comments: post.comments.filter((c) => !ids.has(String(c.author))) };
+};
+
 /** Consistent shape for every paginated list the API returns. */
-const paginate = async (query, { page, limit }, countFilter) => {
+const paginate = async (query, { page, limit }, countFilter, hidden = []) => {
     const [items, total] = await Promise.all([
         query
             .sort({ createdAt: -1 })
@@ -18,23 +26,35 @@ const paginate = async (query, { page, limit }, countFilter) => {
     ]);
 
     return {
-        items,
+        items: items.map((p) => withoutHiddenComments(p, hidden)),
         pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
     };
 };
 
-export const createPostService = (data) => Post.create(data);
+const emptyPage = ({ page, limit }) => ({ items: [], pagination: { page, limit, total: 0, pages: 1 } });
 
-export const getPostByIdService = async (postId) => {
-    const post = await Post.findById(postId).populate("author", AUTHOR_FIELDS);
-    if (!post) throw notFound("Post not found");
+/** Load a post the viewer is allowed to see; blocked either way reads as missing. */
+const findVisiblePost = async (postId, viewerId) => {
+    const post = await Post.findById(postId);
+    if (!post || (await isBlockedBetween(viewerId, post.author))) throw notFound("Post not found");
     return post;
 };
 
-export const getPostsService = (pagination) =>
+export const createPostService = (data) => Post.create(data);
+
+export const getPostByIdService = async (postId, viewerId) => {
+    const post = await findVisiblePost(postId, viewerId);
+    await post.populate("author", AUTHOR_FIELDS);
+    return withoutHiddenComments(post.toJSON(), await hiddenUserIds(viewerId));
+};
+
+export const getPostsService = async (pagination, viewerId) => {
     // An empty result is a legitimate empty feed, not an error. The previous
     // implementation threw 'No posts found', which surfaced as a 500.
-    paginate(Post.find(), pagination, {});
+    const hidden = await hiddenUserIds(viewerId);
+    const filter = { author: { $nin: hidden } };
+    return paginate(Post.find(filter), pagination, filter, hidden);
+};
 
 /**
  * Load a post and assert the caller owns it.
@@ -64,12 +84,15 @@ export const deletePostService = async (postId, userId) => {
     return post;
 };
 
-export const getUserPostsService = (userId, pagination) =>
-    paginate(Post.find({ author: userId }), pagination, { author: userId });
+/** A user's posts; empty when the viewer and author have blocked each other. */
+export const getUserPostsService = async (userId, pagination, viewerId) => {
+    if (viewerId && (await isBlockedBetween(viewerId, userId))) return emptyPage(pagination);
+    const hidden = await hiddenUserIds(viewerId);
+    return paginate(Post.find({ author: userId }), pagination, { author: userId }, hidden);
+};
 
 export const commentPostService = async (postId, user, content) => {
-    const post = await Post.findById(postId);
-    if (!post) throw notFound("Post not found");
+    const post = await findVisiblePost(postId, user._id);
 
     post.comments.push({
         author: user._id,
@@ -86,8 +109,7 @@ export const commentPostService = async (postId, user, content) => {
 };
 
 export const toggleLikeService = async (postId, userId) => {
-    const post = await Post.findById(postId);
-    if (!post) throw notFound("Post not found");
+    const post = await findVisiblePost(postId, userId);
 
     const id = userId.toString();
     const alreadyLiked = post.likes.some((likeId) => likeId.toString() === id);
@@ -116,21 +138,24 @@ export const feedPostsService = async (userId, pagination) => {
 
     // Include the user's own posts so a new account's feed isn't empty.
     const authorIds = [...user.following, user._id];
-    const filter = { author: { $in: authorIds } };
+    const hidden = await hiddenUserIds(userId);
+    const filter = { author: { $in: authorIds, $nin: hidden } };
 
-    return paginate(Post.find(filter), pagination, filter);
+    return paginate(Post.find(filter), pagination, filter, hidden);
 };
 
-export const searchPostsService = (searchQuery, pagination) => {
+export const searchPostsService = async (searchQuery, pagination, viewerId) => {
     // Escaped: raw user input reaching $regex is both a ReDoS vector and a way
     // to match every document with '.*'.
     const term = escapeRegex(searchQuery);
+    const hidden = await hiddenUserIds(viewerId);
     const filter = {
+        author: { $nin: hidden },
         $or: [
             { title: { $regex: term, $options: "i" } },
             { content: { $regex: term, $options: "i" } },
         ],
     };
 
-    return paginate(Post.find(filter), pagination, filter);
+    return paginate(Post.find(filter), pagination, filter, hidden);
 };

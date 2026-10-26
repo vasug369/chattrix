@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { errorMessage, fieldErrors } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +42,29 @@ export default function Profile() {
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
 
+  // ⋯ menu and the inline block confirmation (no window.confirm: it blocks
+  // the page and cannot explain what blocking does).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onPointer = (e) => {
+      if (!menuRef.current?.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
   const load = useCallback(async () => {
     if (!targetId) return;
     setLoading(true);
@@ -82,6 +105,20 @@ export default function Profile() {
       setError(errorMessage(err, 'Could not update follow state'));
     } finally {
       setFollowBusy(false);
+    }
+  };
+
+  /** Block or unblock, then reload: blocking also changes follow counts and posts. */
+  const setBlocked = async (blocked) => {
+    setBlockBusy(true);
+    try {
+      await api.put(`/user/${targetId}/${blocked ? 'block' : 'unblock'}`);
+      setConfirmBlock(false);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, blocked ? 'Could not block this account' : 'Could not unblock this account'));
+    } finally {
+      setBlockBusy(false);
     }
   };
 
@@ -329,10 +366,17 @@ export default function Profile() {
                     <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
                       Edit profile
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/settings/blocked')}>
+                      Blocked accounts
+                    </Button>
                     <Button variant="danger" size="sm" onClick={deleteAccount}>
                       Delete
                     </Button>
                   </>
+                ) : profile.isBlocked ? (
+                  <Button size="sm" variant="ghost" loading={blockBusy} onClick={() => setBlocked(false)}>
+                    Unblock
+                  </Button>
                 ) : (
                   <>
                     <Button
@@ -361,10 +405,70 @@ export default function Profile() {
                     >
                       {following ? 'Following' : 'Follow'}
                     </Button>
+                    <div className="relative" ref={menuRef}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="More actions"
+                        aria-haspopup="menu"
+                        aria-expanded={menuOpen}
+                        onClick={() => setMenuOpen((open) => !open)}
+                      >
+                        ⋯
+                      </Button>
+                      {menuOpen && (
+                        <div role="menu" className="glass-panel absolute right-0 top-full z-20 mt-2 w-56 p-2 animate-scale-in">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                            style={{ color: 'var(--danger)' }}
+                            onClick={() => {
+                              setMenuOpen(false);
+                              setConfirmBlock(true);
+                            }}
+                          >
+                            ⛔ Block {profile.name}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
             </div>
+
+            {profile.isBlocked && (
+              <div className="mt-5">
+                <Banner tone="info">
+                  You blocked {profile.name}. They can’t see your profile or posts, message you, or follow you.
+                </Banner>
+              </div>
+            )}
+
+            {confirmBlock && (
+              <div
+                role="alertdialog"
+                aria-labelledby="block-title"
+                aria-describedby="block-desc"
+                className="mt-5 rounded-xl p-4 animate-fade-in"
+                style={{ background: 'rgba(244,63,94,0.10)', border: '1px solid rgba(244,63,94,0.35)' }}
+              >
+                <p id="block-title" className="font-semibold">Block {profile.name}?</p>
+                <p id="block-desc" className="mt-1 text-sm" style={{ color: 'var(--text-dim)' }}>
+                  They won’t be able to see your profile or posts, message you, or follow you, and you’ll
+                  stop following each other. They aren’t notified. You can unblock any time.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button variant="danger" size="sm" loading={blockBusy} onClick={() => setBlocked(true)}>
+                    Block
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmBlock(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 grid grid-cols-3 gap-3 text-center">
               {[
@@ -389,9 +493,15 @@ export default function Profile() {
 
         {!posts.length ? (
           <GlassCard>
-            <EmptyState icon="📝" title="No posts yet">
-              {isSelf ? 'Your posts will appear here once you write one.' : 'This user hasn’t posted yet.'}
-            </EmptyState>
+            {profile.isBlocked ? (
+              <EmptyState icon="🛡️" title="Posts hidden">
+                Posts from accounts you’ve blocked don’t appear anywhere.
+              </EmptyState>
+            ) : (
+              <EmptyState icon="📝" title="No posts yet">
+                {isSelf ? 'Your posts will appear here once you write one.' : 'This user hasn’t posted yet.'}
+              </EmptyState>
+            )}
           </GlassCard>
         ) : (
           <div className="flex flex-col gap-5">

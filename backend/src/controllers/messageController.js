@@ -4,9 +4,10 @@ import User from '../models/user.model.js';
 // Imported from the realtime module rather than server.js — importing the
 // server pulled in a listen() call and a DB connection as a side effect.
 import { emitToUser } from '../realtime/socket.js';
+import { hiddenUserIds, isBlockedBetween } from '../services/blockService.js';
 import { notify } from '../services/notificationService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { badRequest, notFound } from '../utils/AppError.js';
+import { badRequest, forbidden, notFound } from '../utils/AppError.js';
 
 export const sendMessage = asyncHandler(async (req, res) => {
     const { message } = req.body;
@@ -19,6 +20,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     // created a dangling conversation that no one could ever open.
     const receiver = await User.findById(receiverId).select('_id name');
     if (!receiver) throw notFound('Recipient not found');
+    if (await isBlockedBetween(senderId, receiverId)) throw forbidden("You can't message this account");
 
     let conversation = await Conversation.findOne({
         participants: { $all: [senderId, receiverId], $size: 2 },
@@ -92,9 +94,11 @@ export const getUsersForSidebar = asyncHandler(async (req, res) => {
     const conversations = await Conversation.find({ participants: myId })
         .select('participants')
         .lean();
+    // Conversations with blocked accounts (either direction) leave the inbox.
+    const hidden = new Set((await hiddenUserIds(myId)).map(String));
     const otherIds = conversations
         .map((c) => c.participants.find((p) => p.toString() !== myId.toString()))
-        .filter(Boolean);
+        .filter((id) => id && !hidden.has(id.toString()));
 
     const users = await User.find({ _id: { $in: otherIds } })
         .select('name pic bio')

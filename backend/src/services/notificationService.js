@@ -1,6 +1,7 @@
 import Notification from '../models/notification.model.js';
 import { notFound } from '../utils/AppError.js';
 import { emitToUser } from '../realtime/socket.js';
+import { isBlockedBetween } from './blockService.js';
 
 const ACTOR_FIELDS = 'name pic';
 
@@ -17,6 +18,8 @@ export const notify = async ({ recipient, actor, type, post = null, preview = ''
     try {
         // Nobody wants to be told they liked their own post.
         if (!recipient || !actor || recipient.toString() === actor.toString()) return null;
+        // Nothing from a blocked account, in either direction, ever notifies.
+        if (await isBlockedBetween(recipient, actor)) return null;
 
         // For like/follow the unique partial index collapses repeats, so an
         // upsert refreshes the existing row (and re-flags it unread) instead of

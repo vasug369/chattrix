@@ -219,6 +219,26 @@ Edit and delete require ownership. All list endpoints are paginated
 · `GET /user/search?q=` · `GET /user/:id` · `GET /user/is-following/:id`
 · `PUT /user/:id/follow` · `PUT /user/:id/unfollow`
 · `POST /user/me/avatar` · `DELETE /user/me/avatar`
+· `PUT /user/:id/block` · `PUT /user/:id/unblock` · `GET /user/me/blocked`
+
+#### Blocking
+
+Blocking is symmetric in effect: once either person blocks the other, the
+server stops them reaching each other everywhere, and only the blocker can undo
+it. Enforcement lives in `services/blockService.js` and is checked on every
+path, never left to the UI:
+
+| Area | What the blocked pair gets |
+|---|---|
+| Profile | The blocked person gets `404`; the blocker sees `isBlocked: true` and can unblock |
+| Posts | Each other's posts and comments disappear from feed, lists, search and a user's posts; a post by id is `404` |
+| Likes, comments | `404`, as if the post did not exist |
+| Follows | Removed both ways on block; new follows are `403` |
+| Messages | Sending is `403`; the conversation leaves both inboxes; typing signals are not relayed |
+| Notifications | None are created between the two; existing ones are deleted on block |
+
+Who you block is never sent to clients, and the blocked person is not told.
+Unblocking does not restore the follows the block removed.
 
 #### Profile photos
 

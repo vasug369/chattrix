@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import env from '../config/env.js';
+import { isBlockedBetween } from '../services/blockService.js';
 import { socketAuthMiddleware } from './socketAuth.js';
 
 /**
@@ -99,13 +100,19 @@ export const initSocket = (httpServer) => {
 
         if (isFirstSocket) socket.broadcast.emit(PRESENCE_ONLINE, userId);
 
-        socket.on('typing', ({ to }) => {
-            if (to) io.to(roomFor(to)).emit('typing', { from: userId });
-        });
-
-        socket.on('stopTyping', ({ to }) => {
-            if (to) io.to(roomFor(to)).emit('stopTyping', { from: userId });
-        });
+        // Typing signals are relayed only between people who haven't blocked
+        // each other. A failed lookup drops the signal rather than the socket.
+        const relayTyping = (event) => async ({ to } = {}) => {
+            try {
+                if (to && !(await isBlockedBetween(userId, to))) {
+                    io.to(roomFor(to)).emit(event, { from: userId });
+                }
+            } catch {
+                // Invalid id or a database hiccup: a lost typing hint is harmless.
+            }
+        };
+        socket.on('typing', relayTyping('typing'));
+        socket.on('stopTyping', relayTyping('stopTyping'));
 
         socket.on('disconnect', () => {
             const bySession = sessionSockets.get(socket.sessionJti);
