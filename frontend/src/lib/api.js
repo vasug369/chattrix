@@ -32,10 +32,10 @@ const api = axios.create({
 
 /**
  * Realtime cannot use the proxy: Vercel's rewrites do not carry WebSocket
- * upgrades, so socket.io has to reach the API host directly. That host shares
- * the frontend's registrable domain, so the handshake is cross-origin but
- * same-site, and the SameSite=Lax session cookie (scoped by COOKIE_DOMAIN)
- * still travels with it.
+ * upgrades, so socket.io has to reach the API host directly. Its handshake
+ * therefore remains cross-site, and realtime stays unavailable wherever
+ * third-party cookies are blocked — see the note in the PR about moving
+ * socket auth to a short-lived ticket fetched over HTTP.
  */
 export const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ?? (BASE_URL || 'http://localhost:3000');

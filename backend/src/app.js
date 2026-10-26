@@ -14,7 +14,6 @@ import notificationRouter from './routes/notificationRoutes.js';
 import { authMiddleware } from './middlewares/authMiddleware.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
-import { originCheck } from './middlewares/originCheck.js';
 
 const app = express();
 
@@ -46,7 +45,6 @@ app.use(
 );
 
 app.use('/api', apiLimiter);
-app.use('/api', originCheck);
 
 app.get('/api/health', (req, res) => {
     res.status(200).json({ success: true, status: 'ok', uptime: process.uptime() });

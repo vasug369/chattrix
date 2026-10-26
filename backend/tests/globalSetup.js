@@ -13,11 +13,10 @@ let mongoServer;
 let dbPath;
 
 export default async function setup({ provide }) {
-  if (!process.env.MONGOMS_SYSTEM_BINARY && fs.existsSync('/usr/bin/mongod')) {
+  if (!process.env.MONGOMS_SYSTEM_BINARY) {
     // The bundled downloader fetches a ~100MB binary on first run. When the
-    // machine already has a mongod, reuse it; otherwise let it download.
-    // MONGOMS_VERSION silences the "possible version conflict" notice by
-    // declaring what we actually run.
+    // machine already has a mongod, reuse it. MONGOMS_VERSION just silences
+    // the "possible version conflict" notice by declaring what we actually run.
     process.env.MONGOMS_SYSTEM_BINARY = '/usr/bin/mongod';
     process.env.MONGOMS_VERSION ??= '7.0.14';
   }
