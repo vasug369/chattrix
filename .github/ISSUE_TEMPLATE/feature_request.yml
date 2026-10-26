@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an idea for Chattrix
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or missing today, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+      description: What should happen? Screens or flows help.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Product rules
+      description: Chattrix only ships features that keep these.
+      options:
+        - label: Keeps the feed chronological (no ranking)
+          required: true
+        - label: Adds no ads or third-party trackers
+          required: true
+        - label: Does not put messaging, privacy or data export behind a paywall
+          required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

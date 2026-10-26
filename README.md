@@ -13,7 +13,7 @@ A social platform combining microblogging with real-time messaging, built with R
 | Validation | Zod (every endpoint) |
 | Testing    | Vitest + Supertest + mongodb-memory-server (169 tests) |
 | Database   | MongoDB Atlas |
-| Deployment | Frontend: Vercel · Backend: Render |
+| Deployment | Frontend: Vercel (`www.chattrix.online`) · Backend: AWS EC2 + pm2 (`api.chattrix.online`) |
 
 ---
 
@@ -47,7 +47,10 @@ chattrix/
 │   │       └── ui/           # Glass primitives, Aurora background
 │   ├── .env.example
 │   └── package.json
-└── PRD.md / BRD.md / *-context.md
+├── .github/                  # Deploy workflow, PR and issue templates
+├── CLAUDE.md                 # Rules for AI-assisted work
+├── CONTRIBUTING.md           # Setup, workflow, code rules
+└── SECURITY.md               # Vulnerability reporting
 ```
 
 ---
@@ -55,7 +58,7 @@ chattrix/
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20.19+
 - MongoDB (Atlas cluster or local `mongod`)
 - Cloudinary account (optional — uploads are disabled without it, everything else works)
 
@@ -209,9 +212,8 @@ Edit and delete require ownership. All list endpoints are paginated
 #### Profile photos
 
 Uploaded as `multipart/form-data` (field `pic`) to `POST /user/me/avatar`, and
-stored in **Cloudinary**, never on the API server. That is not a preference:
-Render's filesystem is ephemeral, so anything written to disk vanishes on the
-next deploy or spin-down, taking every avatar with it.
+stored in **Cloudinary**, never on the API server. The server's disk is not
+durable storage: a rebuilt or replaced instance would take every avatar with it.
 
 JPEG/PNG/WebP, 5MB max, cropped to a 512×512 square on upload — an avatar sits
 beside every post and comment, so shipping a 4MB phone photo to be scaled down
@@ -327,7 +329,8 @@ Both `prefers-reduced-motion` (stops the drift) and a
 
 | Document | Purpose |
 |----------|---------|
-| [PRD.md](./PRD.md) | Product requirements and feature status |
-| [BRD.md](./BRD.md) | Business model and projections |
-| [backend-context.md](./backend-context.md) | Backend architecture reference |
-| [frontend-context.md](./frontend-context.md) | Frontend architecture reference |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Setup, workflow, code rules, PR checklist |
+| [SECURITY.md](./SECURITY.md) | Reporting vulnerabilities, security design |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | Community standards |
+| [CLAUDE.md](./CLAUDE.md) | Rules for AI-assisted work in this repo |
+| [frontend/README.md](./frontend/README.md) | Frontend layout and environment |
