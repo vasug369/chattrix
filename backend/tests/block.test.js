@@ -47,6 +47,48 @@ describe('block endpoint', () => {
     expect(await Notification.countDocuments()).toBe(0);
   });
 
+  it('restores the follows on unblock, both ways', async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await a.agent.put(`/api/user/${b.id}/follow`).expect(200);
+    await b.agent.put(`/api/user/${a.id}/follow`).expect(200);
+
+    await a.agent.put(`/api/user/${b.id}/block`).expect(200);
+    // Blocking twice must not overwrite the snapshot with the emptied state.
+    await a.agent.put(`/api/user/${b.id}/block`).expect(200);
+    await a.agent.put(`/api/user/${b.id}/unblock`).expect(200);
+
+    const [ua, ub] = await Promise.all([User.findById(a.id), User.findById(b.id)]);
+    expect(ua.following.map(String)).toEqual([b.id]);
+    expect(ua.followers.map(String)).toEqual([b.id]);
+    expect(ub.following.map(String)).toEqual([a.id]);
+    expect(ub.followers.map(String)).toEqual([a.id]);
+  });
+
+  it('restores only the follows that existed', async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await a.agent.put(`/api/user/${b.id}/follow`).expect(200);
+    await a.agent.put(`/api/user/${b.id}/block`).expect(200);
+    await a.agent.put(`/api/user/${b.id}/unblock`).expect(200);
+
+    const [ua, ub] = await Promise.all([User.findById(a.id), User.findById(b.id)]);
+    expect(ua.following.map(String)).toEqual([b.id]);
+    expect(ub.following).toHaveLength(0);
+  });
+
+  it('restores nothing while the other person still blocks you', async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await a.agent.put(`/api/user/${b.id}/follow`).expect(200);
+    await a.agent.put(`/api/user/${b.id}/block`).expect(200);
+    await b.agent.put(`/api/user/${a.id}/block`).expect(200);
+    await a.agent.put(`/api/user/${b.id}/unblock`).expect(200);
+
+    const ua = await User.findById(a.id);
+    expect(ua.following).toHaveLength(0);
+  });
+
   it('never exposes the blocked list on user objects', async () => {
     const { blocker, blocked } = await setup();
     const me = await blocker.agent.get(`/api/user/${blocker.id}`).expect(200);

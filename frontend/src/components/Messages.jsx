@@ -4,6 +4,7 @@ import api, { errorMessage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import ProfileDrawer from './ProfileDrawer';
+import ReportDialog from './ReportDialog';
 import { Avatar, Banner, Button, EmptyState, GlassCard, Skeleton } from './ui/Glass';
 
 const formatTime = (iso) =>
@@ -27,6 +28,8 @@ export default function Messages() {
   const [peerTyping, setPeerTyping] = useState(false);
   const [showSidebarOnMobile, setShowSidebarOnMobile] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+  // A received message being reported.
+  const [reportingId, setReportingId] = useState(null);
 
   const bottomRef = useRef(null);
   const typingTimer = useRef(null);
@@ -195,6 +198,19 @@ export default function Messages() {
       className="grid gap-4 md:grid-cols-[300px_1fr]"
       style={{ height: 'calc(100vh - 8rem)' }}
     >
+      {reportingId && selected && (
+        <ReportDialog
+          target={{ type: 'message', id: reportingId, name: selected.name }}
+          onClose={() => setReportingId(null)}
+          // Blocking removes the conversation from the inbox.
+          onBlocked={() => {
+            setContacts((prev) => prev.filter((c) => c._id !== selected._id));
+            setSelected(null);
+            setMessages([]);
+          }}
+        />
+      )}
+
       {/* Contacts */}
       <GlassCard
         className={`flex flex-col overflow-hidden ${showSidebarOnMobile ? 'flex' : 'hidden'} md:flex`}
@@ -368,6 +384,17 @@ export default function Messages() {
                           >
                             {formatTime(m.createdAt)}
                           </time>
+                          {!mine && (
+                            <button
+                              type="button"
+                              className="cursor-pointer text-[11px] hover:underline"
+                              style={{ color: 'var(--text-muted)' }}
+                              onClick={() => setReportingId(m._id)}
+                              aria-label="Report this message"
+                            >
+                              Report
+                            </button>
+                          )}
                           {mine && (
                             <span
                               className="text-[11px] leading-none"

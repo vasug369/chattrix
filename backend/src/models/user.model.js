@@ -100,6 +100,19 @@ const userSchema = new mongoose.Schema(
             index: true,
         },
 
+        // Follow state between this user and each account they blocked, taken
+        // at block time, so unblocking puts the follows back as they were.
+        blockedFollows: {
+            type: [{
+                _id: false,
+                user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                iFollowed: Boolean,
+                theyFollowed: Boolean,
+            }],
+            default: [],
+            select: false,
+        },
+
         // OTP fields hold a bcrypt hash, never the six digits themselves — a
         // leaked database read otherwise hands over working reset codes.
         verifyOtp: { type: String, default: "", select: false },
@@ -114,6 +127,15 @@ const userSchema = new mongoose.Schema(
         // Bumped on password reset so refresh tokens issued before the reset
         // stop validating (enforced in authMiddleware).
         tokenVersion: { type: Number, default: 0 },
+
+        // Admins reach /api/admin. Set only with scripts/set-role.js, never
+        // through the API.
+        role: { type: String, enum: ['user', 'admin'], default: 'user' },
+
+        // Suspended until this time; a permanent ban uses a far-future date.
+        // While suspended, sign-in is refused and every session is revoked.
+        suspendedUntil: { type: Date, default: null },
+        suspensionReason: { type: String, trim: true, maxlength: 500, default: "" },
     },
     { timestamps: true }
 );
@@ -133,10 +155,17 @@ userSchema.set("toJSON", {
         delete ret.googleId;
         delete ret.picPublicId;
         delete ret.blocked;
+        delete ret.blockedFollows;
         delete ret.__v;
         return ret;
     },
 });
+
+/** A permanent ban is stored as this date. */
+export const PERMANENT_SUSPENSION = new Date("9999-12-31T00:00:00.000Z");
+
+/** True while the account is suspended. */
+export const isSuspended = (user) => Boolean(user?.suspendedUntil && user.suspendedUntil > new Date());
 
 const User = mongoose.model('User', userSchema);
 

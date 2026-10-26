@@ -23,6 +23,8 @@ export default function NavBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  // The Admin link is a convenience only; /api/admin checks the role itself.
+  const links = user?.role === 'admin' ? [...LINKS, { to: '/admin', label: 'Admin', icon: '🛡️' }] : LINKS;
 
   const handleLogout = async () => {
     await logout();
@@ -71,7 +73,7 @@ export default function NavBar() {
         </NavLink>
 
         <div className="hidden flex-1 items-center gap-1 md:flex">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <NavLink key={l.to} to={l.to} className={linkClass(true)} style={linkStyle}>
               <span aria-hidden="true">{l.icon}</span>
               {l.label}
@@ -116,7 +118,7 @@ export default function NavBar() {
 
       {menuOpen && (
         <div className="glass-panel mx-auto mt-2 max-w-6xl p-2 md:hidden animate-scale-in">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <NavLink
               key={l.to}
               to={l.to}

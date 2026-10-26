@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
-import User from '../models/user.model.js';
+import User, { isSuspended } from '../models/user.model.js';
 import { forbidden, unauthorized } from '../utils/AppError.js';
 import { accessCookieOptions } from '../services/authService.js';
 import { findLiveSession, touchSession } from '../services/sessionService.js';
@@ -37,6 +37,8 @@ export const authMiddleware = async (req, res, next) => {
         const decoded = jwt.verify(token, env.JWT_SECRET);
         const user = await User.findById(decoded.id);
         if (!user) return next(unauthorized('Account no longer exists'));
+        // Suspension revokes sessions too; this covers any token minted since.
+        if (isSuspended(user)) return next(unauthorized('Your account is suspended'));
         // Checked here too, not just on the refresh path: otherwise a password
         // reset left the existing access token usable until it expired.
         if ((decoded.tokenVersion ?? 0) !== user.tokenVersion) {
@@ -71,6 +73,7 @@ export const authMiddleware = async (req, res, next) => {
 
     const user = await User.findById(decodedRefresh.id);
     if (!user) return next(unauthorized('Account no longer exists'));
+    if (isSuspended(user)) return next(unauthorized('Your account is suspended'));
 
     // A password reset bumps tokenVersion, retiring refresh tokens minted
     // before it.
@@ -110,6 +113,12 @@ export const authMiddleware = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+};
+
+/** Admin-only routes. The role is read from the database on every request. */
+export const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin') return next(forbidden('Admins only'));
+  return next();
 };
 
 /**

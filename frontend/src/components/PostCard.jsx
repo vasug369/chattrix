@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { errorMessage } from '../lib/api';
+import ReportDialog from './ReportDialog';
 import { Avatar, Button, GlassCard } from './ui/Glass';
+import MoreMenu from './ui/MoreMenu';
 
 const timeAgo = (iso) => {
   if (!iso) return '';
@@ -38,6 +40,8 @@ export default function PostCard({ post, currentUserId, onChange, onDelete, onEr
   const [commentText, setCommentText] = useState('');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: post.title, content: post.content });
+  // What is being reported: the post itself or one of its comments.
+  const [reportTarget, setReportTarget] = useState(null);
 
   const author = post.author ?? {};
   const authorId = author._id ?? author;
@@ -111,6 +115,14 @@ export default function PostCard({ post, currentUserId, onChange, onDelete, onEr
 
   return (
     <GlassCard hover className="p-5 animate-fade-in-up sm:p-6">
+      {reportTarget && (
+        <ReportDialog
+          target={reportTarget}
+          onClose={() => setReportTarget(null)}
+          // Blocking the author hides their posts everywhere, this one included.
+          onBlocked={() => reportTarget.type === 'post' && onDelete?.(post._id)}
+        />
+      )}
       <header className="mb-4 flex items-center gap-3">
         <Link to={`/profile/${authorId}`}>
           <Avatar src={author.pic} name={author.name} size={44} />
@@ -127,6 +139,18 @@ export default function PostCard({ post, currentUserId, onChange, onDelete, onEr
             {post.updatedAt && ' · edited'}
           </time>
         </div>
+
+        {!isOwner && currentUserId && (
+          <MoreMenu
+            label="Post actions"
+            items={[
+              {
+                label: '🚩 Report post',
+                onSelect: () => setReportTarget({ type: 'post', id: post._id, name: author.name }),
+              },
+            ]}
+          />
+        )}
 
         {isOwner && !editing && (
           <div className="flex gap-1.5">
@@ -261,6 +285,18 @@ export default function PostCard({ post, currentUserId, onChange, onDelete, onEr
                     <p className="mt-0.5 break-words text-sm" style={{ color: 'var(--text-dim)' }}>
                       {c.content}
                     </p>
+                    {c._id && String(c.author) !== String(currentUserId) && (
+                      <button
+                        type="button"
+                        className="mt-1 cursor-pointer text-[11px] hover:underline"
+                        style={{ color: 'var(--text-muted)' }}
+                        onClick={() =>
+                          setReportTarget({ type: 'comment', id: c._id, postId: post._id, name: c.name })
+                        }
+                      >
+                        Report
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

@@ -27,6 +27,9 @@ export const getMe = asyncHandler(async (req, res) => {
             pic: req.user.pic,
             bio: req.user.bio,
             isAccountVerified: req.user.isAccountVerified,
+            // For showing the Admin link only; the server checks the role
+            // again on every admin request.
+            role: req.user.role ?? 'user',
             followerCount: req.user.followers?.length ?? 0,
             followingCount: req.user.following?.length ?? 0,
         },
