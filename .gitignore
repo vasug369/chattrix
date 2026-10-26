@@ -166,3 +166,6 @@ backend-context.md
 frontend-context.md
 *-context.md
 Chattrix-*.pdf
+
+# Local development output (demo logins from npm run seed)
+local-dev/

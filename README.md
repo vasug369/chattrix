@@ -77,6 +77,30 @@ The server validates its configuration at boot and refuses to start with a
 precise error if anything is missing, rather than failing later with an
 opaque 500.
 
+### Local database and demo data
+
+Local development uses one persistent database, `chattrix_local`, on a local
+MongoDB. Fill it with demo users, follows, posts, comments, messages and a
+blocked pair:
+
+```bash
+cd backend
+npm run seed       # MONGO_URI defaults to mongodb://127.0.0.1:27017/chattrix_local
+```
+
+- **Add-only and idempotent:** it creates what is missing and never deletes or
+  overwrites data, so it is safe to re-run.
+- **Local only:** it reads `MONGO_URI` from the shell, never from `.env`, and
+  refuses any host other than localhost.
+- **Demo logins** are written to `local-dev/accounts.txt` (git-ignored).
+
+Run the API against it, overriding production values that may be in `.env`:
+
+```bash
+MONGO_URI=mongodb://127.0.0.1:27017/chattrix_local COOKIE_DOMAIN= \
+CORS_ORIGINS=http://localhost:5173 MAIL_PROVIDER=disabled npm run dev
+```
+
 ### Frontend
 
 ```bash
