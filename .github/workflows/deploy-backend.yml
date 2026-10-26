@@ -8,10 +8,17 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
+      - '.github/workflows/ci.yml'
   workflow_dispatch: {} # lets you trigger it manually from the Actions tab
 
 jobs:
+  # Same checks as pull requests. Deploy waits for them, so a change that
+  # breaks the tests never reaches the server.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - name: SSH in and deploy

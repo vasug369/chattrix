@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import User from '../models/user.model.js';
-import { unauthorized } from '../utils/AppError.js';
+import { forbidden, unauthorized } from '../utils/AppError.js';
 import { accessCookieOptions } from '../services/authService.js';
 import { findLiveSession, touchSession } from '../services/sessionService.js';
 
@@ -112,10 +112,15 @@ export const authMiddleware = async (req, res, next) => {
   }
 };
 
-/** Routes that require a verified email address, not merely a session. */
+/**
+ * Routes that require a verified email address, not merely a session.
+ *
+ * 403, not 401: the session is valid, so the client must not treat this as
+ * being signed out (the frontend redirects to login on any 401).
+ */
 export const requireVerifiedEmail = (req, res, next) => {
   if (!req.user?.isAccountVerified) {
-    return next(unauthorized('Please verify your email address to continue'));
+    return next(forbidden('Verify your email address to post, comment or send messages'));
   }
   return next();
 };
