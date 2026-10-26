@@ -22,6 +22,7 @@ import mongoose from 'mongoose';
 import Conversation from '../src/models/conversation.model.js';
 import Message from '../src/models/message.model.js';
 import Post from '../src/models/post.model.js';
+import Report from '../src/models/report.model.js';
 import User from '../src/models/user.model.js';
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chattrix_local';
@@ -40,6 +41,7 @@ const USERS = [
   { key: 'kabir', name: 'Kabir Singh', bio: 'Robotics. Our rover made the finals.' },
   { key: 'meera', name: 'Meera Iyer', bio: 'Design Club. Pixels and posters.' },
   { key: 'spam', name: 'Promo Deals', bio: 'Buy followers cheap!!', unverified: true },
+  { key: 'admin', name: 'Chattrix Admin', bio: 'Keeps Chattrix safe.', role: 'admin' },
 ];
 
 const FOLLOWS = [
@@ -68,10 +70,18 @@ const MESSAGES = [
 
 const BLOCKS = [['aanya', 'spam']];
 
+// Open reports, so the admin queue has something to review.
+// [reporter, targetType, target author, post title (for posts), reason, details]
+const REPORTS = [
+  ['rohan', 'post', 'spam', 'FREE FOLLOWERS', 'spam', 'Selling followers'],
+  ['isha', 'post', 'spam', 'FREE FOLLOWERS', 'spam', ''],
+  ['meera', 'user', 'spam', null, 'spam', 'Spam account'],
+];
+
 const email = (key) => `${key}@chattrix.local`;
 
 await mongoose.connect(MONGO_URI);
-const created = { users: 0, posts: 0, messages: 0 };
+const created = { users: 0, posts: 0, messages: 0, reports: 0 };
 
 // Users: created only if the email is new; existing accounts are left alone.
 const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
@@ -85,9 +95,11 @@ for (const u of USERS) {
       password: hash,
       bio: u.bio,
       isAccountVerified: !u.unverified,
+      role: u.role ?? 'user',
     });
     created.users += 1;
   }
+  if (u.role && doc.role !== u.role) await User.updateOne({ _id: doc._id }, { $set: { role: u.role } });
   ids[u.key] = doc._id;
 }
 
@@ -126,11 +138,26 @@ for (const [a, b] of BLOCKS) {
   await User.updateOne({ _id: ids[a] }, { $addToSet: { blocked: ids[b] } });
 }
 
+for (const [reporter, targetType, author, title, reason, details] of REPORTS) {
+  const target = targetType === 'post' ? await Post.findOne({ author: ids[author], title }).lean() : { _id: ids[author] };
+  if (!target || (await Report.exists({ reporter: ids[reporter], targetType, targetId: target._id }))) continue;
+  await Report.create({
+    reporter: ids[reporter],
+    targetType,
+    targetId: target._id,
+    targetUser: ids[author],
+    reason,
+    details,
+    snapshot: targetType === 'post' ? `${target.title}\n\n${target.content}` : USERS.find((u) => u.key === author).name,
+  });
+  created.reports += 1;
+}
+
 // Local-only cheat sheet of the demo logins.
 const outDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../local-dev');
 fs.mkdirSync(outDir, { recursive: true });
 const outFile = path.join(outDir, 'accounts.txt');
-const rows = USERS.map((u) => `${u.name.padEnd(14)} ${email(u.key).padEnd(24)} ${DEMO_PASSWORD}${u.unverified ? '   (unverified email)' : ''}`);
+const rows = USERS.map((u) => `${u.name.padEnd(14)} ${email(u.key).padEnd(24)} ${DEMO_PASSWORD}${u.unverified ? '   (unverified email)' : ''}${u.role === 'admin' ? '   (admin: open /admin)' : ''}`);
 fs.writeFileSync(
   outFile,
   [
@@ -141,13 +168,14 @@ fs.writeFileSync(
     `${'Name'.padEnd(14)} ${'Email'.padEnd(24)} Password`,
     ...rows,
     '',
-    'Aanya has blocked "Promo Deals". Regenerate with: cd backend && npm run seed',
+    'Aanya has blocked "Promo Deals". The admin queue has open reports about Promo Deals.',
+    'Regenerate with: cd backend && npm run seed',
     '',
   ].join('\n')
 );
 
 console.log(`Seeded ${MONGO_URI}`);
-console.log(`  new users ${created.users}, new posts ${created.posts}, new messages ${created.messages}`);
+console.log(`  new users ${created.users}, new posts ${created.posts}, new messages ${created.messages}, new reports ${created.reports}`);
 console.log(`  demo logins written to ${outFile}`);
 
 await mongoose.disconnect();

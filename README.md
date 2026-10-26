@@ -262,7 +262,8 @@ path, never left to the UI:
 | Notifications | None are created between the two; existing ones are deleted on block |
 
 Who you block is never sent to clients, and the blocked person is not told.
-Unblocking does not restore the follows the block removed.
+Unblocking restores the follows the block removed, as they were at block time
+(unless the other person has blocked you meanwhile).
 
 #### Profile photos
 
@@ -288,6 +289,45 @@ afterwards.
 
 `GET /notifications` · `GET /notifications/unread-count`
 · `PATCH /notifications/:id/read` · `PATCH /notifications/read-all`
+
+### Reports
+`POST /reports` with `{ targetType, targetId, postId?, reason, details?, alsoBlock? }`
+
+- `targetType`: `post`, `comment` (needs `postId`), `message`, or `user`.
+- `reason`: `spam`, `harassment`, `hate`, `nudity`, `self_harm`, `other`.
+- You can report only what you can see, never your own content. Only the
+  recipient can report a message.
+- One open report per person per item (`409` on a repeat).
+- The text is captured at report time, so the evidence survives an edit or a
+  delete. Reported messages are the only messages a moderator ever sees.
+- Open to unverified accounts: anyone signed in must be able to report abuse.
+
+### Admin (moderation)
+Admin-only, with the role checked on the server for every request (`403` for
+everyone else). Every action is written to an append-only audit log.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET  | `/admin/reports?status=open` | Reports grouped by item, busiest then oldest |
+| GET  | `/admin/reports/:id` | Item snapshot, every report on it, the author's history |
+| POST | `/admin/reports/:id/resolve` | `{ action: remove \| dismiss, note }`; closes every open report on the item |
+| GET  | `/admin/users?q=&status=` | Accounts with open-report counts |
+| POST | `/admin/users/:id/suspend` | `{ days: 1 \| 7 \| 30 \| null, reason }`; `null` is a permanent ban |
+| POST | `/admin/users/:id/unsuspend` | Lift a suspension |
+| GET  | `/admin/audit` | The audit log, newest first |
+
+Suspension signs the account out everywhere (`tokenVersion` plus every session
+revoked, sockets closed). Sign-in is refused with the end date and reason, but
+only after a correct password, so it never confirms an account to a guesser.
+Admins can't be suspended.
+
+There is no API for granting admin, so a compromised account can't promote
+itself. Use the script, with the database given explicitly:
+
+```bash
+cd backend
+MONGO_URI=<connection string> npm run set-role -- you@example.com admin
+```
 
 ### Socket events
 Server emits `getOnlineUsers`, `newMessage`, `messagesRead`,

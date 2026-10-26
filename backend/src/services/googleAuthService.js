@@ -3,7 +3,7 @@ import * as googleClient from '../config/googleClient.js';
 import { queueMail } from '../config/mailer.js';
 import User from '../models/user.model.js';
 import { badRequest, forbidden, unauthorized } from '../utils/AppError.js';
-import { issueTokens, welcomeEmail } from './authService.js';
+import { assertNotSuspended, issueTokens, welcomeEmail } from './authService.js';
 import { createSession } from './sessionService.js';
 
 /**
@@ -102,6 +102,8 @@ export const signInWithGoogle = async (credential, req) => {
   }
 
   if (isNewAccount) queueMail({ to: email, ...welcomeEmail(user.name) });
+
+  assertNotSuspended(user);
 
   const session = await createSession(user._id, req);
 

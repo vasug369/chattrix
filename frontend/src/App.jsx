@@ -1,6 +1,6 @@
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Navigate, BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 
 import Aurora from './components/ui/Aurora';
@@ -18,6 +18,10 @@ import ForgotPassword from './components/ForgotPassword';
 import Sessions from './components/Sessions';
 import SearchPeople from './components/SearchPeople';
 import BlockedUsers from './components/BlockedUsers';
+import AdminReports from './components/admin/AdminReports';
+import AdminReportDetail from './components/admin/AdminReportDetail';
+import AdminUsers from './components/admin/AdminUsers';
+import AdminAudit from './components/admin/AdminAudit';
 
 /** Protected pages share the nav bar; the auth pages deliberately do not. */
 const Shell = ({ children }) => (
@@ -31,6 +35,22 @@ const Shell = ({ children }) => (
       <Footer />
     </div>
   </ProtectedRoute>
+);
+
+/**
+ * Admin pages for admins only. This guard is UX: it keeps the pages out of
+ * view; the server refuses every /api/admin request from anyone else.
+ */
+const AdminOnly = ({ children }) => {
+  const { user } = useAuth();
+  if (!user) return null;
+  return user.role === 'admin' ? children : <Navigate to="/dashboard" replace />;
+};
+
+const AdminPage = ({ children }) => (
+  <Shell>
+    <AdminOnly>{children}</AdminOnly>
+  </Shell>
 );
 
 function App() {
@@ -55,6 +75,11 @@ function App() {
             <Route path="/messages" element={<Shell><Messages /></Shell>} />
             <Route path="/sessions" element={<Shell><Sessions /></Shell>} />
             <Route path="/settings/blocked" element={<Shell><BlockedUsers /></Shell>} />
+
+            <Route path="/admin" element={<AdminPage><AdminReports /></AdminPage>} />
+            <Route path="/admin/reports/:id" element={<AdminPage><AdminReportDetail /></AdminPage>} />
+            <Route path="/admin/users" element={<AdminPage><AdminUsers /></AdminPage>} />
+            <Route path="/admin/audit" element={<AdminPage><AdminAudit /></AdminPage>} />
 
             <Route
               path="*"

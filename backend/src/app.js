@@ -10,6 +10,8 @@ import userRouter from './routes/userRoutes.js';
 import profileRouter from './routes/profileRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import notificationRouter from './routes/notificationRoutes.js';
+import reportRouter from './routes/reportRoutes.js';
+import adminRouter from './routes/adminRoutes.js';
 
 import { authMiddleware } from './middlewares/authMiddleware.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
@@ -62,6 +64,8 @@ protectedRoutes.use('/user', userRouter);
 protectedRoutes.use('/myProfile', profileRouter);
 protectedRoutes.use('/messages', messageRouter);
 protectedRoutes.use('/notifications', notificationRouter);
+protectedRoutes.use('/reports', reportRouter);
+protectedRoutes.use('/admin', adminRouter);
 
 app.use('/api', authMiddleware, protectedRoutes);
 

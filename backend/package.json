@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "set-role": "node scripts/set-role.js"
   },
   "keywords": [],
   "author": "",

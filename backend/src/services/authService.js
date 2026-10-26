@@ -2,8 +2,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import { queueMail } from '../config/mailer.js';
-import User from '../models/user.model.js';
-import { badRequest, conflict, unauthorized } from '../utils/AppError.js';
+import User, { PERMANENT_SUSPENSION, isSuspended } from '../models/user.model.js';
+import { badRequest, conflict, forbidden, unauthorized } from '../utils/AppError.js';
 import { compareOtp, generateOtp, hashOtp, isExpired, otpExpiry } from '../utils/otp.js';
 import { createSession, revokeAllSessionsService } from './sessionService.js';
 
@@ -176,6 +176,17 @@ export const registerUser = async ({ name, email, password, pic }) => {
   return user;
 };
 
+/** Refuse sign-in for a suspended account, saying until when and why. */
+export const assertNotSuspended = (user) => {
+  if (!isSuspended(user)) return;
+  const until =
+    user.suspendedUntil >= PERMANENT_SUSPENSION
+      ? 'permanently'
+      : `until ${user.suspendedUntil.toUTCString()}`;
+  const why = user.suspensionReason ? ` Reason: ${user.suspensionReason}` : '';
+  throw forbidden(`Your account is suspended ${until}.${why}`);
+};
+
 export const loginUser = async ({ email, password }, req) => {
   // password is `select: false` on the schema, so it must be asked for.
   const user = await User.findOne({ email }).select('+password');
@@ -194,6 +205,10 @@ export const loginUser = async ({ email, password }, req) => {
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw unauthorized('Invalid email or password');
+
+  // Checked only after the password, so a suspension is never revealed to
+  // someone who doesn't know it.
+  assertNotSuspended(user);
 
   // A successful login opens a session row; the tokens point at it by jti.
   const session = await createSession(user._id, req);

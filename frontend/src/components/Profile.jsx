@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { errorMessage, fieldErrors } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import PostCard from './PostCard';
+import ReportDialog from './ReportDialog';
 import { Avatar, Banner, Button, EmptyState, Field, GlassCard, Skeleton, TextArea } from './ui/Glass';
+import MoreMenu from './ui/MoreMenu';
 
 /**
  * Profile page for the signed-in user (/profile) and for anybody else
@@ -42,28 +44,11 @@ export default function Profile() {
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
 
-  // ⋯ menu and the inline block confirmation (no window.confirm: it blocks
-  // the page and cannot explain what blocking does).
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Inline block confirmation (no window.confirm: it blocks the page and
+  // cannot explain what blocking does), and the report dialog.
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onPointer = (e) => {
-      if (!menuRef.current?.contains(e.target)) setMenuOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
+  const [reporting, setReporting] = useState(false);
 
   const load = useCallback(async () => {
     if (!targetId) return;
@@ -244,6 +229,14 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col gap-6">
+      {reporting && (
+        <ReportDialog
+          target={{ type: 'user', id: profile._id, name: profile.name }}
+          onClose={() => setReporting(false)}
+          onBlocked={load}
+        />
+      )}
+
       {error && <Banner tone="error" onDismiss={() => setError('')}>{error}</Banner>}
 
       <GlassCard variant="glass-strong" className="p-6 sm:p-8 animate-fade-in-up">
@@ -405,34 +398,12 @@ export default function Profile() {
                     >
                       {following ? 'Following' : 'Follow'}
                     </Button>
-                    <div className="relative" ref={menuRef}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label="More actions"
-                        aria-haspopup="menu"
-                        aria-expanded={menuOpen}
-                        onClick={() => setMenuOpen((open) => !open)}
-                      >
-                        ⋯
-                      </Button>
-                      {menuOpen && (
-                        <div role="menu" className="glass-panel absolute right-0 top-full z-20 mt-2 w-56 p-2 animate-scale-in">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-white/10"
-                            style={{ color: 'var(--danger)' }}
-                            onClick={() => {
-                              setMenuOpen(false);
-                              setConfirmBlock(true);
-                            }}
-                          >
-                            ⛔ Block {profile.name}
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    <MoreMenu
+                      items={[
+                        { label: `🚩 Report ${profile.name}`, onSelect: () => setReporting(true) },
+                        { label: `⛔ Block ${profile.name}`, onSelect: () => setConfirmBlock(true), danger: true },
+                      ]}
+                    />
                   </>
                 )}
               </div>
@@ -457,7 +428,7 @@ export default function Profile() {
                 <p id="block-title" className="font-semibold">Block {profile.name}?</p>
                 <p id="block-desc" className="mt-1 text-sm" style={{ color: 'var(--text-dim)' }}>
                   They won’t be able to see your profile or posts, message you, or follow you, and you’ll
-                  stop following each other. They aren’t notified. You can unblock any time.
+                  stop following each other. They aren’t notified. Unblocking later puts your follows back.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <Button variant="danger" size="sm" loading={blockBusy} onClick={() => setBlocked(true)}>
